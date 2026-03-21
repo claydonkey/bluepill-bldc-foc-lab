@@ -1,0 +1,9 @@
+../Core/Src/main.c:66:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/main.c:76:6:start_motor	8	static
+../Core/Src/main.c:84:6:stop_motor	8	static
+../Core/Src/main.c:90:6:set_velocity	16	static
+../Core/Src/main.c:95:6:set_pid	24	static
+../Core/Src/main.c:105:5:main	8	static
+../Core/Src/main.c:173:6:SystemClock_Config	88	static
+../Core/Src/main.c:221:6:process_usb_command	200	static
+../Core/Src/main.c:290:6:Error_Handler	4	static,ignoring_inline_asm

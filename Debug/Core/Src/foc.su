@@ -1,0 +1,5 @@
+../Core/Src/foc.c:36:13:set_pwm_counts	32	static
+../Core/Src/foc.c:42:13:apply_d_axis_alignment	40	static
+../Core/Src/foc.c:50:14:get_elec_angle	16	static
+../Core/Src/foc.c:58:6:FOC_Init	16	static
+../Core/Src/foc.c:77:6:FOC_Loop	88	static
