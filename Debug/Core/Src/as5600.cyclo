@@ -1,3 +1,4 @@
-../Core/Src/as5600.c:12:6:AS5600_StartDMA	1
-../Core/Src/as5600.c:21:6:HAL_I2C_MemRxCpltCallback	2
-../Core/Src/as5600.c:37:7:AS5600_GetMechanicalAngle	1
+../Core/Src/as5600.c:20:6:AS5600_StartDMA	1
+../Core/Src/as5600.c:30:6:HAL_I2C_MemRxCpltCallback	7
+../Core/Src/as5600.c:67:6:HAL_I2C_ErrorCallback	2
+../Core/Src/as5600.c:81:7:AS5600_GetMechanicalAngle	1

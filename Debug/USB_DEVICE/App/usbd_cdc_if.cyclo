@@ -3,4 +3,4 @@
 ../USB_DEVICE/App/usbd_cdc_if.c:178:15:CDC_Control_FS	1
 ../USB_DEVICE/App/usbd_cdc_if.c:259:15:CDC_Receive_FS	2
 ../USB_DEVICE/App/usbd_cdc_if.c:293:9:CDC_Transmit_FS	2
-../USB_DEVICE/App/usbd_cdc_if.c:308:5:_write	2
+../USB_DEVICE/App/usbd_cdc_if.c:309:5:_write	2

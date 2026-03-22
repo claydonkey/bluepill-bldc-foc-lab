@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Motor Control Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+            font-size: 2em;
+        }
+
+        .status-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .status-item:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .status-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 0.95em;
+        }
+
+        .status-value {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #667eea;
+            min-width: 100px;
+            text-align: right;
+        }
+
+        .connection-status {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-left: 10px;
+            animation: pulse 2s infinite;
+        }
+
+        .connected {
+            background-color: #00d084;
+        }
+
+        .disconnected {
+            background-color: #ff4757;
+            animation: none;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .gauge-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .gauge {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 10px;
+            padding: 20px;
+            color: white;
+            text-align: center;
+            box-shadow: 0 5px 15px rgba(245, 87, 108, 0.3);
+        }
+
+        .gauge.target {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            box-shadow: 0 5px 15px rgba(79, 172, 254, 0.3);
+        }
+
+        .gauge-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .gauge-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .gauge-unit {
+            font-size: 0.85em;
+            opacity: 0.8;
+        }
+
+        .control-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #764ba2;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        button {
+            padding: 12px 20px;
+            font-size: 1em;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #00d084 0%, #00a875 100%);
+            color: white;
+        }
+
+        .btn-start:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 208, 132, 0.4);
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #ff4757 0%, #ff3838 100%);
+            color: white;
+        }
+
+        .btn-stop:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        .input-group input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s ease;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .input-group button {
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            min-width: 100px;
+        }
+
+        .input-group button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+            padding: 15px;
+            margin-top: 20px;
+            font-size: 0.9em;
+            color: #333;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+
+        .debug-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #28a745;
+        }
+
+        .debug-section h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #28a745;
+            font-size: 1.2em;
+        }
+
+        .debug-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .debug-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+
+        .debug-label {
+            font-weight: 500;
+            color: #495057;
+        }
+
+        .debug-value {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #28a745;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>
+            Motor Control Dashboard
+            <span class="connection-status disconnected" id="connectionStatus"></span>
+        </h1>
+
+        <div class="status-section">
+            <div class="status-item">
+                <span class="status-label">Connection Status:</span>
+                <span class="status-value" id="connectionText">Disconnected</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Last Update:</span>
+                <span class="status-value" id="lastUpdate">N/A</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Alignment Offset:</span>
+                <span class="status-value" id="alignmentOffset">—</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">FOC Status:</span>
+                <span class="status-value" id="focStatus">—</span>
+            </div>
+        </div>
+
+        <div class="gauge-container">
+            <div class="gauge">
+                <div class="gauge-label">Current Velocity</div>
+                <div class="gauge-value" id="velocity">0.00</div>
+                <div class="gauge-unit">rad/s</div>
+            </div>
+            <div class="gauge target">
+                <div class="gauge-label">Target Velocity</div>
+                <div class="gauge-value" id="targetVelocity">0.00</div>
+                <div class="gauge-unit">rad/s</div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>FOC Debug Information</h3>
+            <div class="debug-grid">
+                <div class="debug-item">
+                    <span class="debug-label">Target Velocity:</span>
+                    <span class="debug-value" id="debugTarget">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Actual Velocity:</span>
+                    <span class="debug-value" id="debugActual">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Velocity Error:</span>
+                    <span class="debug-value" id="debugError">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">PID Output (Uq):</span>
+                    <span class="debug-value" id="debugUq">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">PWM A:</span>
+                    <span class="debug-value" id="debugPwmA">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">PWM B:</span>
+                    <span class="debug-value" id="debugPwmB">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">PWM C:</span>
+                    <span class="debug-value" id="debugPwmC">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">PWM Period:</span>
+                    <span class="debug-value" id="debugPwmPeriod">—</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="debug-section">
+            <h3>Diagnostic Information</h3>
+            <div class="debug-grid">
+                <div class="debug-item">
+                    <span class="debug-label">Loop Count:</span>
+                    <span class="debug-value" id="debugLoopCount">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Messages Sent:</span>
+                    <span class="debug-value" id="debugMessagesSent">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Messages Failed:</span>
+                    <span class="debug-value" id="debugMessagesFailed">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Encoder Angle:</span>
+                    <span class="debug-value" id="debugEncoderAngle">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Encoder DMA Callbacks:</span>
+                    <span class="debug-value" id="debugEncoderCallbacks">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Callback Rate:</span>
+                    <span class="debug-value" id="debugCallbackRate">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">I2C Errors:</span>
+                    <span class="debug-value" id="debugI2CErrors">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">DMA Starts:</span>
+                    <span class="debug-value" id="debugDMAStarts">—</span>
+                </div>
+                <div class="debug-item">
+                    <span class="debug-label">Motor Running:</span>
+                    <span class="debug-value" id="debugMotorRunning">—</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <h2 style="margin-bottom: 15px; color: #333;">Motor Control</h2>
+            
+            <div class="button-group">
+                <button class="btn-start" onclick="sendCommand('START')">Start Motor</button>
+                <button class="btn-stop" onclick="sendCommand('STOP')">Stop Motor</button>
+            </div>
+
+            <div class="input-group">
+                <input type="number" id="velocityInput" placeholder="Enter target velocity (rad/s)" step="0.1" min="-2" max="2" value="0.5">
+                <button onclick="setVelocity()" style="background: #667eea; color: white;">Set Velocity</button>
+            </div>
+
+            <h3 style="margin: 20px 0 15px 0; color: #333; font-size: 1.1em;">PID Tuning</h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                <div class="input-group" style="margin: 0;">
+                    <input type="number" id="kpInput" placeholder="Kp" step="0.1" min="0" max="5" value="0.3" style="width: 100%;">
+                    <label style="font-size: 0.8em; color: #666; margin-top: 5px;">Proportional</label>
+                </div>
+                <div class="input-group" style="margin: 0;">
+                    <input type="number" id="kiInput" placeholder="Ki" step="0.1" min="0" max="10" value="1.0" style="width: 100%;">
+                    <label style="font-size: 0.8em; color: #666; margin-top: 5px;">Integral</label>
+                </div>
+                <div class="input-group" style="margin: 0;">
+                    <input type="number" id="kdInput" placeholder="Kd" step="0.01" min="0" max="1" value="0.01" style="width: 100%;">
+                    <label style="font-size: 0.8em; color: #666; margin-top: 5px;">Derivative</label>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button onclick="setPID()" style="background: #28a745; color: white; flex: 1;">Set PID</button>
+                <button onclick="getPID()" style="background: #17a2b8; color: white; flex: 1;">Get PID</button>
+            </div>
+
+            <div class="info-box">
+                <strong>💡 Usage:</strong> Connect your STM32 device via USB CDC, then control the motor speed and monitoring real-time velocity data.
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
