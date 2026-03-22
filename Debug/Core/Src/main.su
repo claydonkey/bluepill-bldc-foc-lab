@@ -5,5 +5,5 @@
 ../Core/Src/main.c:152:6:set_pid	24	static
 ../Core/Src/main.c:163:5:main	144	static
 ../Core/Src/main.c:257:6:SystemClock_Config	88	static
-../Core/Src/main.c:304:6:process_usb_command	304	static
-../Core/Src/main.c:409:6:Error_Handler	4	static,ignoring_inline_asm
+../Core/Src/main.c:304:6:process_usb_command	288	static
+../Core/Src/main.c:389:6:Error_Handler	4	static,ignoring_inline_asm

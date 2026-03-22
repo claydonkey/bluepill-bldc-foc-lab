@@ -10,10 +10,6 @@ extern TIM_HandleTypeDef htim1;
 #define POLE_PAIRS 7    // 2804 motor: 14 poles = 7 pole pairs
 #define VBUS       12.0f
 
-// Control modes
-#define MODE_OPEN_LOOP 0
-#define MODE_VELOCITY  1
-
 ControlMode_t control_mode = MODE_VELOCITY;
 float target_velocity = 0.0f;
 float target_position = 0.0f;
@@ -61,15 +57,9 @@ void FOC_GetPID(float *Kp, float *Ki, float *Kd) {
     if (Kd) *Kd = vel_pid.kd;
 }
 
-void FOC_OpenLoopTest(float duty_cycle) {
-    // Simple open-loop test: apply fixed PWM to phase A only
-    // This bypasses all FOC calculations to test basic motor driver
-    float pwm_value = duty_cycle * pwm_period;
-    
-    // Apply PWM to phase A only, others at 0
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, (uint32_t)pwm_value);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 0);
+void FOC_ResetPID(void) {
+    vel_pid.integral = 0.0f;
+    vel_pid.prev_error = 0.0f;
 }
 
 
@@ -220,8 +210,8 @@ void FOC_Loop(void) {
         if (motor_running) {
             // When running: compact format with essential data only
             len = snprintf(debug_msg, sizeof(debug_msg),
-                "{\"foc\":{\"v\":%.2f,\"t\":%.2f,\"lc\":%lu,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"err\":%.3f,\"uq\":%.3f}}\r\n",
-                velocity, target_velocity, foc_loop_count, pwm1, pwm2, pwm3, pwm_period, err, Uq);
+                "{\"foc\":{\"v\":%.2f,\"t\":%.2f,\"lc\":%lu,\"pwm\":[%lu,%lu,%lu],\"per\":%lu}}\r\n",
+                velocity, target_velocity, foc_loop_count, pwm1, pwm2, pwm3, pwm_period);
         } else {
             // When stopped: velocity and encoder data
             len = snprintf(debug_msg, sizeof(debug_msg),
@@ -242,14 +232,6 @@ void FOC_Loop(void) {
 
     // Only do FOC control if motor is running
     if (!motor_running) return;
-
-    // Check control mode
-    extern ControlMode_t control_mode;
-    if (control_mode == MODE_OPEN_LOOP) {
-        // In open-loop mode, PWM is already set by FOC_OpenLoopTest()
-        // Just maintain the current PWM values
-        return;
-    }
 
     float Uq = 0.0f;
     float err = 0.0f; // Declare err here so it's available for debug

@@ -112,21 +112,6 @@ function processInputBuffer() {
                 else if (data.foc !== undefined) {
                     updateFOCDebugDisplay(data.foc);
                 }
-                // Check for motor driver status
-                else if (data.motor_driver !== undefined) {
-                    console.log('Motor driver:', data.motor_driver);
-                    document.getElementById('focStatus').textContent = 'Driver Enabled';
-                }
-                // Check for motor running status
-                else if (data.motor_status !== undefined) {
-                    console.log('Motor status:', data.motor_status);
-                    document.getElementById('focStatus').textContent = 'Running';
-                }
-                // Check for open-loop test status
-                else if (data.open_loop !== undefined) {
-                    console.log('Open-loop test:', data.open_loop);
-                    document.getElementById('focStatus').textContent = 'Open-Loop Test';
-                }
                 // Check for diagnostic (loop count, message status)
                 else if (data.diag !== undefined) {
                     updateDiagnosticDisplay(data.diag);

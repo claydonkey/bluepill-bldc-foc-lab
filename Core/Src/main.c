@@ -377,22 +377,7 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			CDC_Transmit_FS((uint8_t*)pid_msg, len);
 		}
 	}
-	else if (strncmp(command, "OPEN_LOOP:", 10) == 0)
-	{
-		// Open-loop test: "OPEN_LOOP:0.1" for 10% duty cycle
-		float duty = atof(command + 10);
-		if (duty >= 0.0f && duty <= 1.0f) {
-			extern ControlMode_t control_mode;
-			control_mode = MODE_OPEN_LOOP;
-			FOC_OpenLoopTest(duty);
-			char test_msg[64];
-			int len = snprintf(test_msg, sizeof(test_msg),
-				"{\"open_loop\":\"%.2f\"}\r\n", duty);
-			if (len > 0 && len < (int)sizeof(test_msg)) {
-				CDC_Transmit_FS((uint8_t*)test_msg, len);
-			}
-		}
-	}
+
 }
 
 /* USER CODE END 4 */
