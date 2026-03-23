@@ -8,6 +8,23 @@ typedef enum {
     MODE_POSITION
 } ControlMode_t;
 
+typedef struct {
+    float velocity;
+    float target_velocity;
+    uint32_t loop_count;
+    uint32_t messages_sent;
+    uint32_t messages_failed;
+    uint16_t raw_angle;
+    uint32_t pwm1;
+    uint32_t pwm2;
+    uint32_t pwm3;
+    uint32_t pwm_period;
+    uint32_t dma_callbacks;
+    uint32_t dma_errors;
+    uint32_t dma_starts;
+    uint8_t motor_running;
+} FOC_Telemetry_t;
+
 extern ControlMode_t control_mode;
 extern float target_velocity;
 extern float target_position;
@@ -31,5 +48,6 @@ void FOC_ResetPID(void); // Reset PID integral and previous error
 
 void FOC_Init(void);
 void FOC_Loop(void);
+void FOC_GetTelemetry(FOC_Telemetry_t *telemetry);
 
 #endif

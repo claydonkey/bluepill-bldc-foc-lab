@@ -11,6 +11,7 @@
 #include "stm32f1xx_hal.h"
 
 void AS5600_StartDMA(void);
+void AS5600_Service(void);
 float AS5600_GetMechanicalAngle(void);
 
 // Debugging counters

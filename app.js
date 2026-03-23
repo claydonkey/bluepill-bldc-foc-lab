@@ -110,6 +110,7 @@ function processInputBuffer() {
                 }
                 // Check for FOC debug information
                 else if (data.foc !== undefined) {
+                    updateVelocityDisplay(data.foc);
                     updateFOCDebugDisplay(data.foc);
                 }
                 // Check for diagnostic (loop count, message status)

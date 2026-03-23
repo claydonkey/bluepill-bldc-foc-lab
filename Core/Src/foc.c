@@ -44,6 +44,32 @@ float FOC_GetAlignmentOffset(void) {
     return zero_electric_angle;
 }
 
+void FOC_GetTelemetry(FOC_Telemetry_t *telemetry) {
+    extern volatile uint16_t AS5600_raw_angle;
+    extern volatile uint32_t AS5600_dma_callbacks;
+    extern volatile uint32_t AS5600_dma_errors;
+    extern volatile uint32_t AS5600_dma_starts;
+
+    if (telemetry == NULL) {
+        return;
+    }
+
+    telemetry->velocity = velocity;
+    telemetry->target_velocity = target_velocity;
+    telemetry->loop_count = foc_loop_count;
+    telemetry->messages_sent = foc_messages_sent;
+    telemetry->messages_failed = foc_messages_failed;
+    telemetry->raw_angle = AS5600_raw_angle;
+    telemetry->pwm1 = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_1);
+    telemetry->pwm2 = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_2);
+    telemetry->pwm3 = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3);
+    telemetry->pwm_period = __HAL_TIM_GET_AUTORELOAD(&htim1);
+    telemetry->dma_callbacks = AS5600_dma_callbacks;
+    telemetry->dma_errors = AS5600_dma_errors;
+    telemetry->dma_starts = AS5600_dma_starts;
+    telemetry->motor_running = motor_running;
+}
+
 // PID parameter getters and setters
 void FOC_SetPID(float Kp, float Ki, float Kd) {
     vel_pid.kp = Kp;
@@ -97,12 +123,16 @@ void FOC_Init(void) {
 
     // Start continuous DMA reading from AS5600 encoder
     AS5600_StartDMA();
-    HAL_Delay(100); // Allow DMA to start
-    printf("Starting DMA...\n");
+    {
+        uint32_t wait_start = HAL_GetTick();
+        while ((HAL_GetTick() - wait_start) < 100U) {
+            AS5600_Service();
+            HAL_Delay(1);
+        }
+    }
 
     // Phase 1: Apply D-axis alignment voltage to force rotor to known position
     // This aligns the rotor magnetic poles with the stator d-axis
-    printf("Aligning encoder to motor poles...\n");
     
     int alignment_time_ms = 500; // 500ms alignment pulse
     uint32_t start_time = HAL_GetTick();
@@ -110,12 +140,19 @@ void FOC_Init(void) {
     // Apply 2V on D-axis (forcing rotor alignment)
     while ((HAL_GetTick() - start_time) < alignment_time_ms) {
         apply_d_axis_alignment(2.0f); // 2V alignment current
+        AS5600_Service();
         HAL_Delay(1);
     }
     
     // Phase 2: Stop current and read encoder position (now at known alignment)
     set_pwm_counts(0, 0, 0);
-    HAL_Delay(50); // Let rotor settle
+    {
+        uint32_t settle_start = HAL_GetTick();
+        while ((HAL_GetTick() - settle_start) < 50U) {
+            AS5600_Service();
+            HAL_Delay(1);
+        }
+    }
     
     // Phase 3: Read encoder and set zero offset
     // When motors poles are aligned with d-axis, electrical angle should be 0
@@ -125,10 +162,7 @@ void FOC_Init(void) {
         // Store the electrical angle at this known mechanical position
         // This becomes our zero-point calibration for commutation
         zero_electric_angle = fmodf(mech * POLE_PAIRS, 2.0f * M_PI);
-        printf("Encoder Aligned - Mechanical: %.4f rad, Electrical Zero: %.4f rad\n", 
-               mech, zero_electric_angle);
     } else {
-        printf("Error retrieving mechanical angle after alignment\n");
         zero_electric_angle = 0.0f;
     }
     
@@ -143,36 +177,11 @@ void FOC_Init(void) {
     if (len > 0 && len < (int)sizeof(align_msg)) {
         CDC_Transmit_FS((uint8_t*)align_msg, len);
     }
-    
-    printf("FOC Initialization Complete\n");
 }
 
 void FOC_Loop(void) {
     foc_loop_count++;  // Track loop execution count
-    
-    // DIAGNOSTIC: Send status every 10,000 loops (once per second at 10kHz)
-    // to confirm loop is executing and CDC is working
-    static uint32_t diag_counter = 0;
-    static uint32_t last_callbacks = 0;
-    if (++diag_counter >= 10000) {
-        extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
-        extern volatile uint32_t AS5600_dma_callbacks;
-        extern volatile uint32_t AS5600_dma_errors;
-        extern volatile uint32_t AS5600_dma_starts;
-        extern volatile uint16_t AS5600_raw_angle;
-        uint32_t callback_rate = AS5600_dma_callbacks - last_callbacks;
-        last_callbacks = AS5600_dma_callbacks;
-        char diag_msg[140];
-        int len = snprintf(diag_msg, sizeof(diag_msg),
-            "{\"diag\":{\"lc\":%lu,\"sent\":%lu,\"failed\":%lu,\"enc\":%u,\"cb\":%lu,\"cbrate\":%lu,\"err\":%lu,\"start\":%lu,\"run\":%d}}\r\n",
-            foc_loop_count, foc_messages_sent, foc_messages_failed,
-            AS5600_raw_angle, AS5600_dma_callbacks, callback_rate, AS5600_dma_errors, AS5600_dma_starts, motor_running);
-        if (len > 0 && len < (int)sizeof(diag_msg)) {
-            CDC_Transmit_FS((uint8_t*)diag_msg, len);
-        }
-        diag_counter = 0;
-    }
-    
+
     // Always calculate velocity from encoder, even when motor is stopped
     // Use fixed FOC loop rate based on TIM2 config (prescaler=71, period=99 => 10kHz)
     const float FOC_LOOP_FREQ_HZ = 10000.0f;
@@ -190,45 +199,6 @@ void FOC_Loop(void) {
     if (theta_e < 0) theta_e += 2.0f * M_PI;
 
     prev_mech_angle = mech;
-
-    // DEBUG: Send status to web app every 5000 loops (~500ms at 10kHz, ~2 msgs/sec)
-    // Reduced further to prevent USB buffer overflow
-    static int debug_counter = 0;
-    if (++debug_counter >= 5000) {
-        extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
-        extern volatile uint16_t AS5600_raw_angle;
-        extern TIM_HandleTypeDef htim1;
-        char debug_msg[128];
-        int len;
-
-        // Get current PWM values
-        uint32_t pwm1 = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_1);
-        uint32_t pwm2 = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_2);
-        uint32_t pwm3 = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3);
-        uint32_t pwm_period = __HAL_TIM_GET_AUTORELOAD(&htim1);
-
-        if (motor_running) {
-            // When running: compact format with essential data only
-            len = snprintf(debug_msg, sizeof(debug_msg),
-                "{\"foc\":{\"v\":%.2f,\"t\":%.2f,\"lc\":%lu,\"pwm\":[%lu,%lu,%lu],\"per\":%lu}}\r\n",
-                velocity, target_velocity, foc_loop_count, pwm1, pwm2, pwm3, pwm_period);
-        } else {
-            // When stopped: velocity and encoder data
-            len = snprintf(debug_msg, sizeof(debug_msg),
-                "{\"foc\":{\"v\":%.2f,\"r\":%u,\"lc\":%lu,\"pwm\":[%lu,%lu,%lu],\"per\":%lu}}\r\n",
-                velocity, AS5600_raw_angle, foc_loop_count, pwm1, pwm2, pwm3, pwm_period);
-        }
-
-        if (len > 0 && len < (int)sizeof(debug_msg)) {
-            uint8_t result = CDC_Transmit_FS((uint8_t*)debug_msg, len);
-            if (result == USBD_OK) {
-                foc_messages_sent++;
-            } else {
-                foc_messages_failed++;
-            }
-        }
-        debug_counter = 0;
-    }
 
     // Only do FOC control if motor is running
     if (!motor_running) return;

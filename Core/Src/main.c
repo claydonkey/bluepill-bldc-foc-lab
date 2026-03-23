@@ -63,10 +63,32 @@ extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 void process_usb_command(const char *cmd_buf, uint32_t len);
+static void BluePill_ForceUsbReenumeration(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static void BluePill_ForceUsbReenumeration(void)
+{
+	GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+	__HAL_RCC_GPIOA_CLK_ENABLE();
+
+	// Blue Pill boards often need D+ forced low briefly so the host sees a disconnect.
+	GPIO_InitStruct.Pin = GPIO_PIN_12;
+	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+	GPIO_InitStruct.Pull = GPIO_NOPULL;
+	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
+	HAL_Delay(20);
+
+	// Release PA12 so the USB peripheral can take ownership during MX_USB_DEVICE_Init().
+	GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+	HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+	HAL_Delay(20);
+}
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM2)
@@ -81,31 +103,33 @@ void start_motor()
 {
 	// Enable motor driver (active HIGH)
 	HAL_GPIO_WritePin(MOT1_EN_GPIO_Port, MOT1_EN_Pin, GPIO_PIN_SET);
-	
+
 	// Send status message about motor driver enable
 	extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 	char status_msg[64];
 	int len = snprintf(status_msg, sizeof(status_msg),
-		"{\"motor_driver\":\"enabled\"}\r\n");
-	if (len > 0 && len < (int)sizeof(status_msg)) {
-		CDC_Transmit_FS((uint8_t*)status_msg, len);
+										 "{\"motor_driver\":\"enabled\"}\r\n");
+	if (len > 0 && len < (int)sizeof(status_msg))
+	{
+		CDC_Transmit_FS((uint8_t *)status_msg, len);
 	}
-	
+
 	// Perform encoder alignment (applies alignment pulse, takes ~500ms)
 	FOC_Init();
-	
+
 	// FOC timer is already running for velocity measurement
 	// HAL_TIM_Base_Start_IT(&htim2);  // Already started in main()
-	
+
 	// Set motor running flag
 	extern volatile uint8_t motor_running;
 	motor_running = 1;
-	
+
 	// Send final status
 	len = snprintf(status_msg, sizeof(status_msg),
-		"{\"motor_status\":\"running\"}\r\n");
-	if (len > 0 && len < (int)sizeof(status_msg)) {
-		CDC_Transmit_FS((uint8_t*)status_msg, len);
+								 "{\"motor_status\":\"running\"}\r\n");
+	if (len > 0 && len < (int)sizeof(status_msg))
+	{
+		CDC_Transmit_FS((uint8_t *)status_msg, len);
 	}
 }
 
@@ -114,19 +138,19 @@ void stop_motor()
 	// Set motor running flag to 0 first
 	extern volatile uint8_t motor_running;
 	motor_running = 0;
-	
+
 	// Keep FOC timer running for velocity measurement
 	// HAL_TIM_Base_Stop_IT(&htim2);  // Don't stop timer, keep velocity updates
-		// Reset PID to prevent integral windup
+	// Reset PID to prevent integral windup
 	FOC_ResetPID();
-		// Disable motor driver (active HIGH, so set low to disable)
+	// Disable motor driver (active HIGH, so set low to disable)
 	HAL_GPIO_WritePin(MOT1_EN_GPIO_Port, MOT1_EN_Pin, GPIO_PIN_RESET);
-	
+
 	// Reset PWM outputs to zero
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_2, 0);
 	__HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_3, 0);
-	
+
 	// Reset target velocity
 	target_velocity = 0.0f;
 }
@@ -135,17 +159,17 @@ void set_velocity(float velocity)
 {
 	// Set the target velocity for the motor
 	target_velocity = velocity;
-	
+
 	// Reset PID when changing target to prevent windup
 	FOC_ResetPID();
-	
+
 	// Send confirmation with current target
 	char vel_msg[64];
 	int len = snprintf(vel_msg, sizeof(vel_msg),
-		"{\"target_vel\":%.2f}\r\n", target_velocity);
+										 "{\"target_vel\":%.2f}\r\n", target_velocity);
 	if (len > 0 && len < (int)sizeof(vel_msg))
 	{
-		CDC_Transmit_FS((uint8_t*)vel_msg, len);
+		CDC_Transmit_FS((uint8_t *)vel_msg, len);
 	}
 }
 
@@ -181,13 +205,14 @@ int main(void)
 
 	/* USER CODE BEGIN SysInit */
 	//__HAL_RCC_AFIO_CLK_ENABLE();
-	//AFIO->MAPR &= ~AFIO_MAPR_TIM1_REMAP;
+	// AFIO->MAPR &= ~AFIO_MAPR_TIM1_REMAP;
 	/* USER CODE END SysInit */
 
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
 	MX_DMA_Init();
 	MX_I2C1_Init();
+	BluePill_ForceUsbReenumeration();
 	MX_USB_DEVICE_Init();
 	MX_TIM1_Init();
 	MX_TIM2_Init();
@@ -206,9 +231,9 @@ int main(void)
 
 	control_mode = MODE_VELOCITY;
 	target_velocity = 0.0f; // Start with zero velocity - wait for START command
-	
+
 	// Send startup confirmation
-	CDC_Transmit_FS((uint8_t*)"{\"status\":\"ready\"}\r\n", strlen("{\"status\":\"ready\"}\r\n"));
+	CDC_Transmit_FS((uint8_t *)"{\"status\":\"ready\"}\r\n", strlen("{\"status\":\"ready\"}\r\n"));
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -218,30 +243,65 @@ int main(void)
 		/* USER CODE END WHILE */
 		if (usb_rx_ready)
 		{
-			process_usb_command((const char*) usb_rx_buffer, usb_rx_len);
-			usb_rx_ready = 0; // Clear the flag
-			usb_rx_len = 0;   // Reset length
+			process_usb_command((const char *)usb_rx_buffer, usb_rx_len);
+			usb_rx_ready = 0;															// Clear the flag
+			usb_rx_len = 0;																// Reset length
 			memset(usb_rx_buffer, 0, USB_RX_BUFFER_SIZE); // Clear buffer for next reception
 		}
+		AS5600_Service();
 		if (foc_flag)
 		{
 			foc_flag = 0;
-			FOC_Loop();   // Call from main loop, not ISR
+			FOC_Loop(); // Call from main loop, not ISR
 		}
-		// Send telemetry less frequently to avoid overwhelming USB
-		// Only send every 500ms to prevent buffer overflow
+		// Send one CDC packet per slot. Back-to-back Transmit calls commonly return
+		// USBD_BUSY because the previous USB IN transfer is still in flight.
 		static uint32_t last_telemetry_time = 0;
+		static uint8_t send_diag_next = 0;
 		uint32_t current_time = HAL_GetTick();
-		if ((current_time - last_telemetry_time) >= 500) {
-			float current_velocity = FOC_GetVelocity();
-			char telemetry[96];
+		if ((current_time - last_telemetry_time) >= 250)
+		{
+			FOC_Telemetry_t foc_telemetry;
+			char telemetry[192];
+			char diag[192];
+			FOC_GetTelemetry(&foc_telemetry);
 			int len = snprintf(telemetry, sizeof(telemetry),
-				"{\"vel\":%.2f,\"target\":%.2f}\r\n", 
-				current_velocity, target_velocity);
-			if (len > 0 && len < (int)sizeof(telemetry)) {
-				uint8_t result = CDC_Transmit_FS((uint8_t*)telemetry, len);
-				if (result == USBD_OK) {
+												 "{\"foc\":{\"v\":%.2f,\"t\":%.2f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"err\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
+												 foc_telemetry.velocity, foc_telemetry.target_velocity,
+												 foc_telemetry.loop_count, foc_telemetry.raw_angle,
+												 foc_telemetry.pwm1, foc_telemetry.pwm2, foc_telemetry.pwm3,
+												 foc_telemetry.pwm_period, foc_telemetry.dma_callbacks,
+												 foc_telemetry.dma_errors, foc_telemetry.dma_starts,
+												 foc_telemetry.motor_running);
+			int diag_len = snprintf(diag, sizeof(diag),
+															"{\"diag\":{\"lc\":%lu,\"sent\":%lu,\"failed\":%lu,\"enc\":%u,\"cb\":%lu,\"err\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
+															foc_telemetry.loop_count, foc_telemetry.messages_sent,
+															foc_telemetry.messages_failed, foc_telemetry.raw_angle,
+															foc_telemetry.dma_callbacks, foc_telemetry.dma_errors,
+															foc_telemetry.dma_starts, foc_telemetry.motor_running);
+			if (len > 0 && len < (int)sizeof(telemetry) &&
+					diag_len > 0 && diag_len < (int)sizeof(diag))
+			{
+				uint8_t result;
+				if (send_diag_next)
+				{
+					result = CDC_Transmit_FS((uint8_t *)diag, diag_len);
+				}
+				else
+				{
+					result = CDC_Transmit_FS((uint8_t *)telemetry, len);
+				}
+				if (result == USBD_OK)
+				{
+					extern volatile uint32_t foc_messages_sent;
+					foc_messages_sent++;
 					last_telemetry_time = current_time;
+					send_diag_next ^= 1U;
+				}
+				else
+				{
+					extern volatile uint32_t foc_messages_failed;
+					foc_messages_failed++;
 				}
 			}
 		}
@@ -257,11 +317,11 @@ int main(void)
 void SystemClock_Config(void)
 {
 	RCC_OscInitTypeDef RCC_OscInitStruct =
-	{ 0 };
+			{0};
 	RCC_ClkInitTypeDef RCC_ClkInitStruct =
-	{ 0 };
+			{0};
 	RCC_PeriphCLKInitTypeDef PeriphClkInit =
-	{ 0 };
+			{0};
 
 	/** Initializes the RCC Oscillators according to the specified parameters
 	 * in the RCC_OscInitTypeDef structure.
@@ -342,14 +402,14 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		// Extract the velocity value from the command
 		float velocity = atof(command + 13); // Convert string to float
 		set_velocity(velocity);
-		
+
 		// Send immediate confirmation with updated target
 		char confirm_msg[64];
 		int len = snprintf(confirm_msg, sizeof(confirm_msg),
-			"{\"vel\":%.3f,\"target\":%.3f}\r\n", FOC_GetVelocity(), velocity);
+											 "{\"vel\":%.3f,\"target\":%.3f}\r\n", FOC_GetVelocity(), velocity);
 		if (len > 0 && len < (int)sizeof(confirm_msg))
 		{
-			CDC_Transmit_FS((uint8_t*)confirm_msg, len);
+			CDC_Transmit_FS((uint8_t *)confirm_msg, len);
 		}
 	}
 	else if (strcmp(command, "GET_VELOCITY") == 0)
@@ -358,10 +418,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		float current_velocity = FOC_GetVelocity();
 		char vel_msg[64];
 		int len = snprintf(vel_msg, sizeof(vel_msg),
-			"{\"vel\":%.3f,\"target\":%.3f}\r\n", current_velocity, target_velocity);
+											 "{\"vel\":%.3f,\"target\":%.3f}\r\n", current_velocity, target_velocity);
 		if (len > 0 && len < (int)sizeof(vel_msg))
 		{
-			CDC_Transmit_FS((uint8_t*)vel_msg, len);
+			CDC_Transmit_FS((uint8_t *)vel_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_PID", 7) == 0)
@@ -371,13 +431,28 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		FOC_GetPID(&Kp, &Ki, &Kd);
 		char pid_msg[128];
 		int len = snprintf(pid_msg, sizeof(pid_msg),
-			"{\"pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
+											 "{\"pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
 		if (len > 0 && len < (int)sizeof(pid_msg))
 		{
-			CDC_Transmit_FS((uint8_t*)pid_msg, len);
+			CDC_Transmit_FS((uint8_t *)pid_msg, len);
 		}
 	}
+	else if (strncmp(command, "SET_PID:", 8) == 0)
+	{
+		float Kp, Ki, Kd;
+		if (sscanf(command + 8, "%f,%f,%f", &Kp, &Ki, &Kd) == 3)
+		{
+			set_pid(Kp, Ki, Kd);
 
+			char pid_msg[128];
+			int len = snprintf(pid_msg, sizeof(pid_msg),
+												 "{\"pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
+			if (len > 0 && len < (int)sizeof(pid_msg))
+			{
+				CDC_Transmit_FS((uint8_t *)pid_msg, len);
+			}
+		}
+	}
 }
 
 /* USER CODE END 4 */
@@ -398,17 +473,17 @@ void Error_Handler(void)
 }
 #ifdef USE_FULL_ASSERT
 /**
-  * @brief  Reports the name of the source file and the source line number
-  *         where the assert_param error has occurred.
-  * @param  file: pointer to the source file name
-  * @param  line: assert_param error line source number
-  * @retval None
-  */
+ * @brief  Reports the name of the source file and the source line number
+ *         where the assert_param error has occurred.
+ * @param  file: pointer to the source file name
+ * @param  line: assert_param error line source number
+ * @retval None
+ */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-  /* USER CODE BEGIN 6 */
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-  /* USER CODE END 6 */
+	/* USER CODE BEGIN 6 */
+	/* User can add his own implementation to report the file name and line number,
+		 ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+	/* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */

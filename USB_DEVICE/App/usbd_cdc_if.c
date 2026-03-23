@@ -294,6 +294,16 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
 {
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
+	if ((Buf == NULL) || (Len == 0U))
+	{
+		return USBD_FAIL;
+	}
+
+	if ((hUsbDeviceFS.pClassData == NULL) || (hUsbDeviceFS.dev_state != USBD_STATE_CONFIGURED))
+	{
+		return USBD_BUSY;
+	}
+
 	USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*) hUsbDeviceFS.pClassData;
 	if (hcdc->TxState != 0)
 	{
@@ -308,15 +318,19 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
 int _write(int file, char *ptr, int len)
 {
-	uint8_t result = CDC_Transmit_FS((uint8_t*) ptr, len);
-
-	// If busy, wait until the USB endpoint is free
-	while (result == USBD_BUSY)
+	(void)file;
+	if ((ptr == NULL) || (len <= 0))
 	{
-		result = CDC_Transmit_FS((uint8_t*) ptr, len);
+		return 0;
 	}
 
-	return len;
+	// Debug prints must never stall the command/control path.
+	if (CDC_Transmit_FS((uint8_t*)ptr, (uint16_t)len) == USBD_OK)
+	{
+		return len;
+	}
+
+	return 0;
 }
 
 /* USER CODE END PRIVATE_FUNCTIONS_IMPLEMENTATION */
