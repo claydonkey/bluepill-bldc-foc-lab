@@ -18,9 +18,14 @@ typedef enum {
 
 typedef struct {
     float velocity;
+    float mechanical_angle;
     float target_velocity;
+    float target_position;
     float velocity_error;
     float uq_voltage;
+    float alignment_offset;
+    float sensor_direction;
+    float voltage_limit;
     uint32_t loop_count;
     uint32_t messages_sent;
     uint32_t messages_failed;
@@ -33,6 +38,10 @@ typedef struct {
     uint32_t dma_errors;
     uint32_t dma_starts;
     uint8_t motor_running;
+    uint8_t control_mode;
+    uint8_t modulation_mode;
+    uint8_t phase_map;
+    uint8_t uq_saturated;
 } FOC_Telemetry_t;
 
 extern ControlMode_t control_mode;

@@ -81,9 +81,14 @@ void FOC_GetTelemetry(FOC_Telemetry_t *telemetry)
     }
 
     telemetry->velocity = velocity;
+    telemetry->mechanical_angle = AS5600_mech_angle;
     telemetry->target_velocity = target_velocity;
+    telemetry->target_position = target_position;
     telemetry->velocity_error = last_velocity_error;
     telemetry->uq_voltage = last_uq_voltage;
+    telemetry->alignment_offset = zero_electric_angle;
+    telemetry->sensor_direction = sensor_direction;
+    telemetry->voltage_limit = uq_voltage_limit;
     telemetry->loop_count = foc_loop_count;
     telemetry->messages_sent = foc_messages_sent;
     telemetry->messages_failed = foc_messages_failed;
@@ -96,6 +101,10 @@ void FOC_GetTelemetry(FOC_Telemetry_t *telemetry)
     telemetry->dma_errors = AS5600_dma_errors;
     telemetry->dma_starts = AS5600_dma_starts;
     telemetry->motor_running = motor_running;
+    telemetry->control_mode = (uint8_t)control_mode;
+    telemetry->modulation_mode = (uint8_t)modulation_mode;
+    telemetry->phase_map = phase_map;
+    telemetry->uq_saturated = (uint8_t)(fabsf(last_uq_voltage) >= (uq_voltage_limit - 0.01f));
 }
 
 // PID parameter getters and setters

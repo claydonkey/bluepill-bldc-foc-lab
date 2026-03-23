@@ -18,6 +18,9 @@ const state = {
     inputBuffer: '',
     velocityHistory: [],
     velocityHistoryLimit: 120,
+    positionHistory: [],
+    positionHistoryLimit: 120,
+    traceMode: 'velocity',
     autotuneResult: null
 };
 
@@ -111,6 +114,9 @@ function processInputBuffer() {
                 // Check for target velocity confirmation
                 else if (data.target_vel !== undefined) {
                     updateTargetVelocityDisplay(data);
+                }
+                else if (data.target_pos !== undefined || data.pos !== undefined) {
+                    updatePositionDisplay(data);
                 }
                 // Check for FOC debug information
                 else if (data.foc !== undefined) {
@@ -226,6 +232,14 @@ function updateTargetVelocityDisplay(data) {
     }
 }
 
+function updatePositionDisplay(data) {
+    if (data.target_pos !== undefined) {
+        document.getElementById('positionInput').value = parseFloat(data.target_pos).toFixed(3);
+    } else if (data.tp !== undefined) {
+        document.getElementById('positionInput').value = parseFloat(data.tp).toFixed(3);
+    }
+}
+
 /**
  * Update FOC debug display with current control values
  * @param {Object} focData - FOC debug data object
@@ -270,8 +284,44 @@ function updateFOCDebugDisplay(focData) {
         document.getElementById('debugPwmPeriod').textContent = focData.per;
     }
 
+    if (focData.mech !== undefined) {
+        pushPositionSample(parseFloat(focData.mech));
+    }
+
     // Update FOC status indicator
     document.getElementById('focStatus').textContent = 'Active';
+
+    if (focData.mode !== undefined) {
+        const modeNames = ['Velocity', 'Position', 'Open Loop', 'Vector Test', 'Torque'];
+        const modeText = modeNames[focData.mode] || String(focData.mode);
+        document.getElementById('controlMode').textContent = modeText;
+        const heroMode = document.getElementById('heroMode');
+        if (heroMode) {
+            heroMode.textContent = modeText;
+        }
+    }
+    if (focData.mod !== undefined) {
+        const modulation = (parseInt(focData.mod, 10) === 1) ? 'Sine' : 'SVPWM';
+        document.getElementById('modulationStatus').textContent = modulation;
+        const heroModulation = document.getElementById('heroModulation');
+        if (heroModulation) {
+            heroModulation.textContent = modulation;
+        }
+    }
+    if (focData.vlim !== undefined) {
+        const voltageText = parseFloat(focData.vlim).toFixed(2) + ' V';
+        document.getElementById('voltageLimitStatus').textContent = voltageText;
+        const heroVoltageLimit = document.getElementById('heroVoltageLimit');
+        if (heroVoltageLimit) {
+            heroVoltageLimit.textContent = voltageText;
+        }
+    }
+    if (focData.usat !== undefined) {
+        document.getElementById('uqSaturatedStatus').textContent = focData.usat ? 'Yes' : 'No';
+    }
+    if (focData.align !== undefined) {
+        document.getElementById('alignmentOffset').textContent = parseFloat(focData.align).toFixed(4) + ' rad';
+    }
 }
 
 /**
@@ -321,6 +371,10 @@ function updateDiagnosticDisplay(diagData) {
 
 function updateOpenLoopDisplay(openLoopData) {
     document.getElementById('focStatus').textContent = 'Open Loop';
+    const heroMode = document.getElementById('heroMode');
+    if (heroMode) {
+        heroMode.textContent = 'Open Loop';
+    }
     console.log('Open-loop mode:', openLoopData);
 }
 
@@ -331,15 +385,22 @@ function updateOpenLoopDisplay(openLoopData) {
 function updateConnectionStatus(connected) {
     const statusElement = document.getElementById('connectionStatus');
     const statusText = document.getElementById('connectionText');
+    const heroConnection = document.getElementById('heroConnection');
 
     if (connected) {
         statusElement.classList.add('connected');
         statusElement.classList.remove('disconnected');
         statusText.textContent = 'Connected';
+        if (heroConnection) {
+            heroConnection.textContent = 'Connected';
+        }
     } else {
         statusElement.classList.add('disconnected');
         statusElement.classList.remove('connected');
         statusText.textContent = 'Disconnected';
+        if (heroConnection) {
+            heroConnection.textContent = 'Disconnected';
+        }
     }
 }
 
@@ -372,7 +433,8 @@ async function sendCommand(command) {
             document.getElementById('debugPwmB').textContent = '—';
             document.getElementById('debugPwmC').textContent = '—';
             state.velocityHistory = [];
-            drawVelocityPlot();
+            state.positionHistory = [];
+            drawTracePlot();
         }
     } catch (error) {
         console.error('Failed to send command:', error);
@@ -393,6 +455,22 @@ async function setVelocity() {
 
     const command = `SET_VELOCITY:${velocity.toFixed(2)}`;
     await sendCommand(command);
+}
+
+async function setPosition() {
+    const input = document.getElementById('positionInput');
+    const position = parseFloat(input.value);
+
+    if (isNaN(position) || position < -1000 || position > 1000) {
+        alert('Please enter a valid position between -1000 and 1000 rad');
+        return;
+    }
+
+    await sendCommand(`SET_POSITION:${position.toFixed(3)}`);
+}
+
+async function getPosition() {
+    await sendCommand('GET_POSITION');
 }
 
 async function startOpenLoop() {
@@ -434,6 +512,10 @@ function updateVectorTestDisplay(vectorTest) {
         select.value = String(vectorTest.index);
     }
     document.getElementById('focStatus').textContent = 'Vector Test';
+    const heroMode = document.getElementById('heroMode');
+    if (heroMode) {
+        heroMode.textContent = 'Vector Test';
+    }
     console.log('Vector test:', vectorTest);
 }
 
@@ -441,6 +523,11 @@ function updateModulationDisplay(modulation) {
     const select = document.getElementById('modulationSelect');
     if (select) {
         select.value = modulation;
+    }
+    document.getElementById('modulationStatus').textContent = modulation === 'SINE' ? 'Sine' : modulation;
+    const heroModulation = document.getElementById('heroModulation');
+    if (heroModulation) {
+        heroModulation.textContent = modulation === 'SINE' ? 'Sine' : modulation;
     }
     console.log('Modulation set to:', modulation);
 }
@@ -479,13 +566,32 @@ function pushVelocitySample(value) {
     if (state.velocityHistory.length > state.velocityHistoryLimit) {
         state.velocityHistory.shift();
     }
-    drawVelocityPlot();
+    drawTracePlot();
 }
 
-function drawVelocityPlot() {
-    const canvas = document.getElementById('velocityPlot');
-    const meta = document.getElementById('velocityPlotMeta');
-    if (!canvas || !meta) {
+function pushPositionSample(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+
+    state.positionHistory.push(value);
+    if (state.positionHistory.length > state.positionHistoryLimit) {
+        state.positionHistory.shift();
+    }
+    drawTracePlot();
+}
+
+function setTraceMode() {
+    const select = document.getElementById('traceModeSelect');
+    state.traceMode = select ? select.value : 'velocity';
+    drawTracePlot();
+}
+
+function drawTracePlot() {
+    const canvas = document.getElementById('tracePlot');
+    const meta = document.getElementById('tracePlotMeta');
+    const note = document.getElementById('tracePlotNote');
+    if (!canvas || !meta || !note) {
         return;
     }
 
@@ -497,7 +603,7 @@ function drawVelocityPlot() {
     const innerWidth = width - (paddingX * 2);
     const innerHeight = height - (paddingY * 2);
     const zeroY = paddingY + (innerHeight * 0.5);
-    const history = state.velocityHistory;
+    const history = state.traceMode === 'position' ? state.positionHistory : state.velocityHistory;
     const maxAbs = history.length > 0 ? Math.max(0.5, ...history.map(sample => Math.abs(sample))) : 0.5;
 
     ctx.clearRect(0, 0, width, height);
@@ -552,7 +658,13 @@ function drawVelocityPlot() {
     }
 
     ctx.restore();
-    meta.textContent = `Window: ${history.length} samples | Scale: ±${maxAbs.toFixed(2)} rad/s`;
+    if (state.traceMode === 'position') {
+        meta.textContent = `Window: ${history.length} samples | Scale: ±${maxAbs.toFixed(2)} rad`;
+        note.textContent = 'Rolling trace of measured mechanical position from FOC telemetry.';
+    } else {
+        meta.textContent = `Window: ${history.length} samples | Scale: ±${maxAbs.toFixed(2)} rad/s`;
+        note.textContent = 'Rolling trace of measured velocity from FOC telemetry.';
+    }
 }
 
 /**
@@ -635,31 +747,17 @@ async function disconnectSerialPort() {
  * Initialize connection button listener
  */
 document.addEventListener('DOMContentLoaded', function () {
-    // Add connection button
-    const header = document.querySelector('h1');
     const connectBtn = document.createElement('button');
-    connectBtn.textContent = '🔌 Connect Serial Port';
-    connectBtn.style.cssText = `
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        padding: 10px 15px;
-        background: #667eea;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 0.9em;
-        font-weight: 600;
-    `;
+    connectBtn.textContent = 'Connect Serial Port';
+    connectBtn.className = 'connect-button';
     connectBtn.onclick = connectSerialPort;
 
-    // Insert button in the container
-    const container = document.querySelector('.container');
-    container.style.position = 'relative';
-    container.insertBefore(connectBtn, container.firstChild);
+    const toolbarSlot = document.getElementById('toolbarSlot');
+    if (toolbarSlot) {
+        toolbarSlot.appendChild(connectBtn);
+    }
 
-    drawVelocityPlot();
+    drawTracePlot();
 
     console.log('Dashboard initialized. Click "Connect Serial Port" to start.');
 });

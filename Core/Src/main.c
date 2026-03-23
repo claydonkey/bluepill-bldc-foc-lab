@@ -207,6 +207,7 @@ void stop_motor()
 void set_velocity(float velocity)
 {
 	// Set the target velocity for the motor
+	control_mode = MODE_VELOCITY;
 	target_velocity = velocity;
 
 	// Reset PID when changing target to prevent windup
@@ -246,6 +247,21 @@ static void autotune_send_status(const char *status)
 	if (len > 0 && len < (int)sizeof(msg))
 	{
 		CDC_Transmit_FS((uint8_t *)msg, len);
+	}
+}
+
+void set_position(float position)
+{
+	control_mode = MODE_POSITION;
+	target_position = position;
+	FOC_ResetPID();
+
+	char pos_msg[64];
+	int len = snprintf(pos_msg, sizeof(pos_msg),
+										 "{\"target_pos\":%.3f}\r\n", target_position);
+	if (len > 0 && len < (int)sizeof(pos_msg))
+	{
+		CDC_Transmit_FS((uint8_t *)pos_msg, len);
 	}
 }
 
@@ -473,13 +489,16 @@ int main(void)
 		if ((current_time - last_telemetry_time) >= 250)
 		{
 			FOC_Telemetry_t foc_telemetry;
-			char telemetry[192];
+			char telemetry[256];
 			char diag[192];
 			FOC_GetTelemetry(&foc_telemetry);
 			int len = snprintf(telemetry, sizeof(telemetry),
-												 "{\"foc\":{\"v\":%.2f,\"t\":%.2f,\"err\":%.2f,\"uq\":%.2f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
-												 foc_telemetry.velocity, foc_telemetry.target_velocity,
-												 foc_telemetry.velocity_error, foc_telemetry.uq_voltage,
+												 "{\"foc\":{\"v\":%.2f,\"mech\":%.3f,\"t\":%.2f,\"tp\":%.3f,\"err\":%.2f,\"uq\":%.2f,\"vlim\":%.2f,\"usat\":%u,\"mode\":%u,\"mod\":%u,\"pm\":%u,\"adir\":%.0f,\"align\":%.4f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
+												 foc_telemetry.velocity, foc_telemetry.mechanical_angle,
+												 foc_telemetry.target_velocity, foc_telemetry.target_position, foc_telemetry.velocity_error,
+												 foc_telemetry.uq_voltage, foc_telemetry.voltage_limit,
+												 foc_telemetry.uq_saturated, foc_telemetry.control_mode, foc_telemetry.modulation_mode,
+												 foc_telemetry.phase_map, foc_telemetry.sensor_direction, foc_telemetry.alignment_offset,
 												 foc_telemetry.loop_count, foc_telemetry.raw_angle,
 												 foc_telemetry.pwm1, foc_telemetry.pwm2, foc_telemetry.pwm3,
 												 foc_telemetry.pwm_period, foc_telemetry.dma_callbacks,
@@ -723,6 +742,11 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			CDC_Transmit_FS((uint8_t *)confirm_msg, len);
 		}
 	}
+	else if (strncmp(command, "SET_POSITION:", 13) == 0)
+	{
+		float position = atof(command + 13);
+		set_position(position);
+	}
 	else if (strcmp(command, "GET_VELOCITY") == 0)
 	{
 		// Report current velocity and target immediately
@@ -733,6 +757,17 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		if (len > 0 && len < (int)sizeof(vel_msg))
 		{
 			CDC_Transmit_FS((uint8_t *)vel_msg, len);
+		}
+	}
+	else if (strcmp(command, "GET_POSITION") == 0)
+	{
+		char pos_msg[96];
+		int len = snprintf(pos_msg, sizeof(pos_msg),
+											 "{\"pos\":%.3f,\"target_pos\":%.3f}\r\n",
+											 AS5600_mech_angle, target_position);
+		if (len > 0 && len < (int)sizeof(pos_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)pos_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_PID", 7) == 0)
