@@ -37,6 +37,7 @@ static float last_uq_voltage = 0.0f;
 static float open_loop_theta_e = 0.0f;
 static float open_loop_electrical_velocity = 0.0f;
 static float open_loop_uq_voltage = 0.0f;
+static float torque_uq_voltage = 0.0f;
 static float uq_voltage_limit = FOC_DEFAULT_UQ_VOLTAGE_LIMIT;
 static float low_speed_ff_voltage = FOC_DEFAULT_LOW_SPEED_FF_VOLTAGE;
 static float low_speed_ff_fade_speed = FOC_DEFAULT_LOW_SPEED_FF_FADE_SPEED;
@@ -192,6 +193,23 @@ void FOC_StartOpenLoop(float electrical_velocity, float uq_voltage)
         uq_voltage = -uq_voltage_limit;
     }
     open_loop_uq_voltage = uq_voltage;
+    last_velocity_error = 0.0f;
+    last_uq_voltage = uq_voltage;
+    FOC_ResetPID();
+}
+
+void FOC_StartTorque(float uq_voltage)
+{
+    control_mode = MODE_TORQUE;
+    if (uq_voltage > uq_voltage_limit)
+    {
+        uq_voltage = uq_voltage_limit;
+    }
+    else if (uq_voltage < -uq_voltage_limit)
+    {
+        uq_voltage = -uq_voltage_limit;
+    }
+    torque_uq_voltage = uq_voltage;
     last_velocity_error = 0.0f;
     last_uq_voltage = uq_voltage;
     FOC_ResetPID();
@@ -562,6 +580,11 @@ void FOC_Loop(void)
         Uq = vector_test_uq_voltage;
         err = 0.0f;
         theta_e = vector_angles[vector_test_index];
+    }
+    else if (control_mode == MODE_TORQUE)
+    {
+        Uq = torque_uq_voltage;
+        err = 0.0f;
     }
     else if (control_mode == MODE_VELOCITY)
     {

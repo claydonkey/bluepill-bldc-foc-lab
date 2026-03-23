@@ -29,6 +29,7 @@
 #include "as5600.h"
 #include "foc.h"
 #include "motor_control.h"
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -57,6 +58,12 @@ extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 
 // Telemetry variables for sending velocity data
 #define TELEMETRY_INTERVAL 50 // Send velocity every 50ms (20 Hz)
+#define AUTOTUNE_SAMPLE_PERIOD_MS 25U
+#define AUTOTUNE_STEP_DURATION_MS 1800U
+#define AUTOTUNE_SETTLE_DURATION_MS 250U
+#define AUTOTUNE_COAST_DURATION_MS 250U
+#define AUTOTUNE_MAX_SAMPLES 80U
+#define AUTOTUNE_LOAD_HOLD_KI_MULTIPLIER 2.5f
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -68,6 +75,33 @@ static void BluePill_ForceUsbReenumeration(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+typedef enum
+{
+	AUTOTUNE_IDLE = 0,
+	AUTOTUNE_SETTLE,
+	AUTOTUNE_STEP,
+	AUTOTUNE_COAST
+} AutotunePhase_t;
+
+typedef struct
+{
+	uint8_t active;
+	AutotunePhase_t phase;
+	uint32_t phase_start_ms;
+	uint32_t last_sample_ms;
+	float step_uq;
+	float sample_velocity[AUTOTUNE_MAX_SAMPLES];
+	uint32_t sample_time_ms[AUTOTUNE_MAX_SAMPLES];
+	uint32_t sample_count;
+} AutotuneState_t;
+
+static AutotuneState_t autotune = {0};
+
+static void autotune_send_status(const char *status);
+static void autotune_finish(void);
+static void autotune_service(void);
+static void autotune_start(void);
+
 static void BluePill_ForceUsbReenumeration(void)
 {
 	GPIO_InitTypeDef GPIO_InitStruct = {0};
@@ -203,6 +237,157 @@ void set_low_speed_feedforward(float voltage, float fade_speed)
 {
 	FOC_SetLowSpeedFeedforward(voltage, fade_speed);
 }
+
+static void autotune_send_status(const char *status)
+{
+	char msg[96];
+	int len = snprintf(msg, sizeof(msg),
+										 "{\"autotune\":{\"status\":\"%s\"}}\r\n", status);
+	if (len > 0 && len < (int)sizeof(msg))
+	{
+		CDC_Transmit_FS((uint8_t *)msg, len);
+	}
+}
+
+static void autotune_finish(void)
+{
+	float final_velocity = 0.0f;
+	float tau_s = 0.25f;
+	float kp = 0.1f;
+	float ki = 0.1f;
+	float kd = 0.0f;
+	uint32_t tau_ms = 250U;
+	uint32_t final_window_start = (autotune.sample_count > 8U) ? (autotune.sample_count - 8U) : 0U;
+	uint32_t final_count = 0U;
+
+	for (uint32_t i = final_window_start; i < autotune.sample_count; i++)
+	{
+		final_velocity += autotune.sample_velocity[i];
+		final_count++;
+	}
+	if (final_count > 0U)
+	{
+		final_velocity /= (float)final_count;
+	}
+
+	if ((fabsf(final_velocity) > 0.05f) && (fabsf(autotune.step_uq) > 0.05f))
+	{
+		float target63 = final_velocity * 0.632f;
+		for (uint32_t i = 0; i < autotune.sample_count; i++)
+		{
+			float sample = autotune.sample_velocity[i];
+			if (((final_velocity >= 0.0f) && (sample >= target63)) ||
+					((final_velocity < 0.0f) && (sample <= target63)))
+			{
+				tau_ms = autotune.sample_time_ms[i];
+				break;
+			}
+		}
+
+		tau_s = (float)tau_ms / 1000.0f;
+		if (tau_s < 0.05f)
+		{
+			tau_s = 0.05f;
+			tau_ms = 50U;
+		}
+
+		float plant_gain = final_velocity / autotune.step_uq;
+		float lambda = fmaxf(0.10f, tau_s * 0.75f);
+
+		if (fabsf(plant_gain) > 0.02f)
+		{
+			kp = tau_s / (fabsf(plant_gain) * lambda);
+			ki = 1.0f / (fabsf(plant_gain) * lambda);
+		}
+	}
+
+	ki *= AUTOTUNE_LOAD_HOLD_KI_MULTIPLIER;
+	if (ki > 10.0f)
+	{
+		ki = 10.0f;
+	}
+
+	FOC_SetPID(kp, ki, kd);
+	control_mode = MODE_VELOCITY;
+	target_velocity = 0.0f;
+	stop_motor();
+
+	char msg[224];
+	int len = snprintf(msg, sizeof(msg),
+										 "{\"autotune\":{\"status\":\"done\",\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f,\"step_uq\":%.2f,\"final_vel\":%.3f,\"tau_ms\":%lu}}\r\n",
+										 kp, ki, kd, autotune.step_uq, final_velocity, tau_ms);
+	if (len > 0 && len < (int)sizeof(msg))
+	{
+		CDC_Transmit_FS((uint8_t *)msg, len);
+	}
+
+	memset(&autotune, 0, sizeof(autotune));
+}
+
+static void autotune_service(void)
+{
+	if (!autotune.active)
+	{
+		return;
+	}
+
+	uint32_t now = HAL_GetTick();
+
+	switch (autotune.phase)
+	{
+	case AUTOTUNE_SETTLE:
+		if ((now - autotune.phase_start_ms) >= AUTOTUNE_SETTLE_DURATION_MS)
+		{
+			autotune.phase = AUTOTUNE_STEP;
+			autotune.phase_start_ms = now;
+			autotune.last_sample_ms = now;
+			FOC_StartTorque(autotune.step_uq);
+			autotune_send_status("step");
+		}
+		break;
+
+	case AUTOTUNE_STEP:
+		if ((now - autotune.last_sample_ms) >= AUTOTUNE_SAMPLE_PERIOD_MS &&
+				autotune.sample_count < AUTOTUNE_MAX_SAMPLES)
+		{
+			autotune.sample_velocity[autotune.sample_count] = FOC_GetVelocity();
+			autotune.sample_time_ms[autotune.sample_count] = now - autotune.phase_start_ms;
+			autotune.sample_count++;
+			autotune.last_sample_ms = now;
+		}
+
+		if ((now - autotune.phase_start_ms) >= AUTOTUNE_STEP_DURATION_MS)
+		{
+			FOC_StartTorque(0.0f);
+			autotune.phase = AUTOTUNE_COAST;
+			autotune.phase_start_ms = now;
+			autotune_send_status("coast");
+		}
+		break;
+
+	case AUTOTUNE_COAST:
+		if ((now - autotune.phase_start_ms) >= AUTOTUNE_COAST_DURATION_MS)
+		{
+			autotune_finish();
+		}
+		break;
+
+	default:
+		break;
+	}
+}
+
+static void autotune_start(void)
+{
+	memset(&autotune, 0, sizeof(autotune));
+	autotune.active = 1U;
+	autotune.phase = AUTOTUNE_SETTLE;
+	autotune.phase_start_ms = HAL_GetTick();
+	autotune.last_sample_ms = autotune.phase_start_ms;
+	autotune.step_uq = fminf(1.5f, FOC_GetVoltageLimit() * 0.5f);
+	FOC_StartTorque(0.0f);
+	autotune_send_status("settle");
+}
 /* USER CODE END 0 */
 
 /**
@@ -279,6 +464,7 @@ int main(void)
 			foc_flag = 0;
 			FOC_Loop(); // Call from main loop, not ISR
 		}
+		autotune_service();
 		// Send one CDC packet per slot. Back-to-back Transmit calls commonly return
 		// USBD_BUSY because the previous USB IN transfer is still in flight.
 		static uint32_t last_telemetry_time = 0;
@@ -431,6 +617,18 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		if (len > 0 && len < (int)sizeof(mode_msg))
 		{
 			CDC_Transmit_FS((uint8_t *)mode_msg, len);
+		}
+	}
+	else if (strcmp(command, "START_AUTOTUNE") == 0)
+	{
+		if (!motor_running)
+		{
+			start_motor();
+		}
+
+		if (motor_running)
+		{
+			autotune_start();
 		}
 	}
 	else if (strncmp(command, "TEST_VECTOR:", 12) == 0)

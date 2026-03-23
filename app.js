@@ -17,7 +17,8 @@ const state = {
     isConnected: false,
     inputBuffer: '',
     velocityHistory: [],
-    velocityHistoryLimit: 120
+    velocityHistoryLimit: 120,
+    autotuneResult: null
 };
 
 /**
@@ -138,6 +139,9 @@ function processInputBuffer() {
                 }
                 else if (data.feedforward !== undefined) {
                     updateFeedforwardDisplay(data.feedforward);
+                }
+                else if (data.autotune !== undefined) {
+                    updateAutotuneDisplay(data.autotune);
                 } else {
                     console.log('Unknown JSON:', data);
                 }
@@ -451,6 +455,21 @@ function updateFeedforwardDisplay(feedforward) {
     console.log('Feedforward updated:', feedforward);
 }
 
+function updateAutotuneDisplay(autotune) {
+    if (autotune.status !== undefined) {
+        document.getElementById('autotuneStatus').textContent = autotune.status;
+    }
+
+    if (autotune.kp !== undefined && autotune.ki !== undefined && autotune.kd !== undefined) {
+        state.autotuneResult = autotune;
+        document.getElementById('kpInput').value = parseFloat(autotune.kp).toFixed(3);
+        document.getElementById('kiInput').value = parseFloat(autotune.ki).toFixed(3);
+        document.getElementById('kdInput').value = parseFloat(autotune.kd).toFixed(3);
+    }
+
+    console.log('Autotune update:', autotune);
+}
+
 function pushVelocitySample(value) {
     if (!Number.isFinite(value)) {
         return;
@@ -558,6 +577,21 @@ async function setPID() {
  */
 async function getPID() {
     await sendCommand('GET_PID');
+}
+
+async function startAutotune() {
+    document.getElementById('autotuneStatus').textContent = 'starting';
+    state.autotuneResult = null;
+    await sendCommand('START_AUTOTUNE');
+}
+
+async function applyAutotuneResults() {
+    if (!state.autotuneResult) {
+        alert('No autotune result available yet');
+        return;
+    }
+
+    await setPID();
 }
 
 async function setFeedforward() {

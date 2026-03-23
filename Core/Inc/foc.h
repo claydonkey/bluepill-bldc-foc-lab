@@ -7,7 +7,8 @@ typedef enum {
     MODE_VELOCITY,
     MODE_POSITION,
     MODE_OPEN_LOOP,
-    MODE_VECTOR_TEST
+    MODE_VECTOR_TEST,
+    MODE_TORQUE
 } ControlMode_t;
 
 typedef enum {
@@ -65,6 +66,7 @@ void FOC_Init(void);
 void FOC_Loop(void);
 void FOC_GetTelemetry(FOC_Telemetry_t *telemetry);
 void FOC_StartOpenLoop(float electrical_velocity, float uq_voltage);
+void FOC_StartTorque(float uq_voltage);
 void FOC_SetPhaseMap(uint8_t phase_map);
 uint8_t FOC_GetPhaseMap(void);
 void FOC_StartVectorTest(uint8_t vector_index, float uq_voltage);
