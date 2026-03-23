@@ -384,10 +384,9 @@ static void apply_modulation(float Ualpha, float Ubeta)
     float dA, dB, dC;
     svpwm(Ualpha_norm, Ubeta_norm, &dA, &dB, &dC);
 
-    float max_duty = 0.8f;
-    dA = fmaxf(0.0f, fminf(max_duty, dA));
-    dB = fmaxf(0.0f, fminf(max_duty, dB));
-    dC = fmaxf(0.0f, fminf(max_duty, dC));
+    dA = fmaxf(0.0f, fminf(1.0f, dA));
+    dB = fmaxf(0.0f, fminf(1.0f, dB));
+    dC = fmaxf(0.0f, fminf(1.0f, dC));
 
     set_pwm_counts(dA * pwm_period, dB * pwm_period, dC * pwm_period);
 }

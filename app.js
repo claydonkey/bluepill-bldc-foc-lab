@@ -37,6 +37,7 @@ async function connectSerialPort() {
 
         // Start reading data
         readSerialData();
+        await sendCommand('GET_MODULATION');
     } catch (error) {
         console.error('Failed to connect:', error);
         updateConnectionStatus(false);
@@ -409,6 +410,10 @@ async function startVectorTest() {
 async function setModulation() {
     const select = document.getElementById('modulationSelect');
     await sendCommand(`SET_MODULATION:${select.value}`);
+}
+
+async function getModulation() {
+    await sendCommand('GET_MODULATION');
 }
 
 function updatePhaseMapDisplay(phaseMap) {

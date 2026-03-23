@@ -11,34 +11,25 @@ void dq_to_alphabeta(float Ud, float Uq, float theta,
 
 void svpwm(float Ualpha, float Ubeta,
            float *dA, float *dB, float *dC) {
+    const float sqrt3_over_2 = 0.8660254f;
 
-    float X = Ualpha;
-    float Y = (Ualpha + sqrtf(3.0f) * Ubeta) * 0.5f;
-    float Z = (Ualpha - sqrtf(3.0f) * Ubeta) * 0.5f;
+    // Convert alpha-beta vector into three phase references.
+    float Va = Ualpha;
+    float Vb = -0.5f * Ualpha + sqrt3_over_2 * Ubeta;
+    float Vc = -0.5f * Ualpha - sqrt3_over_2 * Ubeta;
 
-    float T1, T2;
-    int sector;
+    // Inject common-mode voltage so the largest and smallest phase
+    // references are centered in the available PWM window. This is the
+    // standard zero-sequence form of SVPWM and avoids sector mapping bugs.
+    float vmax = fmaxf(Va, fmaxf(Vb, Vc));
+    float vmin = fminf(Va, fminf(Vb, Vc));
+    float voffset = -0.5f * (vmax + vmin);
 
-    if (Y >= 0 && Z < 0) sector = 1;
-    else if (X < 0 && Y >= 0) sector = 2;
-    else if (X < 0 && Z >= 0) sector = 3;
-    else if (Y < 0 && Z >= 0) sector = 4;
-    else if (X >= 0 && Y < 0) sector = 5;
-    else sector = 6;
+    Va += voffset;
+    Vb += voffset;
+    Vc += voffset;
 
-    switch (sector) {
-        case 1: T1 = Y;     T2 = X;     break;
-        case 2: T1 = -X;    T2 = Y;     break;
-        case 3: T1 = -Z;    T2 = -X;    break;
-        case 4: T1 = -Y;    T2 = -Z;    break;
-        case 5: T1 = X;     T2 = -Y;    break;
-        default:T1 = Z;     T2 = X;     break;
-    }
-
-    float T0 = 1.0f - T1 - T2;
-    float T0_2 = T0 * 0.5f;
-
-    *dA = T0_2 + T1 + T2;
-    *dB = T0_2 + T2;
-    *dC = T0_2;
+    *dA = 0.5f + Va;
+    *dB = 0.5f + Vb;
+    *dC = 0.5f + Vc;
 }

@@ -499,6 +499,17 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			CDC_Transmit_FS((uint8_t *)mod_msg, mod_len);
 		}
 	}
+	else if (strcmp(command, "GET_MODULATION") == 0)
+	{
+		char mod_msg[64];
+		int mod_len = snprintf(mod_msg, sizeof(mod_msg),
+												 "{\"modulation\":\"%s\"}\r\n",
+												 (FOC_GetModulationMode() == MODULATION_SINE) ? "SINE" : "SVPWM");
+		if (mod_len > 0 && mod_len < (int)sizeof(mod_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)mod_msg, mod_len);
+		}
+	}
 	else if (strncmp(command, "SET_VELOCITY:", 13) == 0)
 	{
 		// Extract the velocity value from the command
