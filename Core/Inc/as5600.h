@@ -13,6 +13,8 @@
 void AS5600_StartDMA(void);
 void AS5600_Service(void);
 float AS5600_GetMechanicalAngle(void);
+uint8_t AS5600_IsHealthy(void);
+uint8_t AS5600_WaitForHealthy(uint32_t timeout_ms);
 
 // Debugging counters
 extern volatile uint32_t AS5600_dma_callbacks;

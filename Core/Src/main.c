@@ -101,6 +101,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void start_motor()
 {
+	if (!AS5600_WaitForHealthy(250))
+	{
+		char fault_msg[96];
+		int fault_len = snprintf(fault_msg, sizeof(fault_msg),
+													 "{\"encoder_fault\":\"offline\",\"cb\":%lu,\"err\":%lu,\"start\":%lu}\r\n",
+													 AS5600_dma_callbacks, AS5600_dma_errors, AS5600_dma_starts);
+		if (fault_len > 0 && fault_len < (int)sizeof(fault_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)fault_msg, fault_len);
+		}
+		return;
+	}
+
+	control_mode = MODE_VELOCITY;
+
 	// Enable motor driver (active HIGH)
 	HAL_GPIO_WritePin(MOT1_EN_GPIO_Port, MOT1_EN_Pin, GPIO_PIN_SET);
 
@@ -177,6 +192,11 @@ void set_pid(float Kp, float Ki, float Kd)
 {
 	// Set PID parameters for velocity control
 	FOC_SetPID(Kp, Ki, Kd);
+}
+
+void set_voltage_limit(float uq_limit)
+{
+	FOC_SetVoltageLimit(uq_limit);
 }
 /* USER CODE END 0 */
 
@@ -266,8 +286,9 @@ int main(void)
 			char diag[192];
 			FOC_GetTelemetry(&foc_telemetry);
 			int len = snprintf(telemetry, sizeof(telemetry),
-												 "{\"foc\":{\"v\":%.2f,\"t\":%.2f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"err\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
+												 "{\"foc\":{\"v\":%.2f,\"t\":%.2f,\"err\":%.2f,\"uq\":%.2f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
 												 foc_telemetry.velocity, foc_telemetry.target_velocity,
+												 foc_telemetry.velocity_error, foc_telemetry.uq_voltage,
 												 foc_telemetry.loop_count, foc_telemetry.raw_angle,
 												 foc_telemetry.pwm1, foc_telemetry.pwm2, foc_telemetry.pwm3,
 												 foc_telemetry.pwm_period, foc_telemetry.dma_callbacks,
@@ -295,7 +316,6 @@ int main(void)
 				{
 					extern volatile uint32_t foc_messages_sent;
 					foc_messages_sent++;
-					last_telemetry_time = current_time;
 					send_diag_next ^= 1U;
 				}
 				else
@@ -303,6 +323,7 @@ int main(void)
 					extern volatile uint32_t foc_messages_failed;
 					foc_messages_failed++;
 				}
+				last_telemetry_time = current_time;
 			}
 		}
 		/* USER CODE BEGIN 3 */
@@ -392,10 +413,86 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		// Start the motor
 		start_motor();
 	}
+	else if (strcmp(command, "START_OPENLOOP") == 0)
+	{
+		extern volatile uint8_t motor_running;
+		FOC_StartOpenLoop(20.0f, 1.0f);
+		HAL_GPIO_WritePin(MOT1_EN_GPIO_Port, MOT1_EN_Pin, GPIO_PIN_SET);
+		motor_running = 1;
+
+		char mode_msg[96];
+		int len = snprintf(mode_msg, sizeof(mode_msg),
+											 "{\"open_loop\":{\"elec_vel\":%.2f,\"uq\":%.2f}}\r\n", 20.0f, 1.0f);
+		if (len > 0 && len < (int)sizeof(mode_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)mode_msg, len);
+		}
+	}
+	else if (strncmp(command, "TEST_VECTOR:", 12) == 0)
+	{
+		int vector_index = atoi(command + 12);
+		if (vector_index >= 0 && vector_index <= 5)
+		{
+			extern volatile uint8_t motor_running;
+			FOC_StartVectorTest((uint8_t)vector_index, 1.0f);
+			HAL_GPIO_WritePin(MOT1_EN_GPIO_Port, MOT1_EN_Pin, GPIO_PIN_SET);
+			motor_running = 1;
+
+			char vector_msg[96];
+			int len = snprintf(vector_msg, sizeof(vector_msg),
+												 "{\"vector_test\":{\"index\":%d,\"uq\":%.2f}}\r\n", vector_index, 1.0f);
+			if (len > 0 && len < (int)sizeof(vector_msg))
+			{
+				CDC_Transmit_FS((uint8_t *)vector_msg, len);
+			}
+		}
+	}
 	else if (strcmp(command, "STOP") == 0)
 	{
 		// Stop the motor
 		stop_motor();
+	}
+	else if (strncmp(command, "SET_PHASE_MAP:", 14) == 0)
+	{
+		int map = atoi(command + 14);
+		if (map >= 0 && map <= 5)
+		{
+			FOC_SetPhaseMap((uint8_t)map);
+			char phase_msg[64];
+			int phase_len = snprintf(phase_msg, sizeof(phase_msg),
+															 "{\"phase_map\":%d}\r\n", map);
+			if (phase_len > 0 && phase_len < (int)sizeof(phase_msg))
+			{
+				CDC_Transmit_FS((uint8_t *)phase_msg, phase_len);
+			}
+		}
+	}
+	else if (strncmp(command, "SET_MODULATION:", 15) == 0)
+	{
+		const char *mode = command + 15;
+		ModulationMode_t new_mode;
+		if (strcmp(mode, "SVPWM") == 0)
+		{
+			new_mode = MODULATION_SVPWM;
+		}
+		else if (strcmp(mode, "SINE") == 0)
+		{
+			new_mode = MODULATION_SINE;
+		}
+		else
+		{
+			return;
+		}
+
+		FOC_SetModulationMode(new_mode);
+		char mod_msg[64];
+		int mod_len = snprintf(mod_msg, sizeof(mod_msg),
+												 "{\"modulation\":\"%s\"}\r\n",
+												 (FOC_GetModulationMode() == MODULATION_SINE) ? "SINE" : "SVPWM");
+		if (mod_len > 0 && mod_len < (int)sizeof(mod_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)mod_msg, mod_len);
+		}
 	}
 	else if (strncmp(command, "SET_VELOCITY:", 13) == 0)
 	{
@@ -435,6 +532,29 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		if (len > 0 && len < (int)sizeof(pid_msg))
 		{
 			CDC_Transmit_FS((uint8_t *)pid_msg, len);
+		}
+	}
+	else if (strncmp(command, "GET_VOLTAGE_LIMIT", 17) == 0)
+	{
+		char limit_msg[64];
+		int len = snprintf(limit_msg, sizeof(limit_msg),
+											 "{\"voltage_limit\":%.2f}\r\n", FOC_GetVoltageLimit());
+		if (len > 0 && len < (int)sizeof(limit_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)limit_msg, len);
+		}
+	}
+	else if (strncmp(command, "SET_VOLTAGE_LIMIT:", 18) == 0)
+	{
+		float uq_limit = atof(command + 18);
+		set_voltage_limit(uq_limit);
+
+		char limit_msg[64];
+		int len = snprintf(limit_msg, sizeof(limit_msg),
+											 "{\"voltage_limit\":%.2f}\r\n", FOC_GetVoltageLimit());
+		if (len > 0 && len < (int)sizeof(limit_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)limit_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_PID:", 8) == 0)

@@ -5,6 +5,6 @@
 ../Core/Src/main.c:158:6:set_velocity	3
 ../Core/Src/main.c:176:6:set_pid	1
 ../Core/Src/main.c:187:5:main	10
-../Core/Src/main.c:317:6:SystemClock_Config	4
-../Core/Src/main.c:364:6:process_usb_command	20
-../Core/Src/main.c:464:6:Error_Handler	1
+../Core/Src/main.c:318:6:SystemClock_Config	4
+../Core/Src/main.c:365:6:process_usb_command	20
+../Core/Src/main.c:465:6:Error_Handler	1

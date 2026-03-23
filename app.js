@@ -116,6 +116,22 @@ function processInputBuffer() {
                 // Check for diagnostic (loop count, message status)
                 else if (data.diag !== undefined) {
                     updateDiagnosticDisplay(data.diag);
+                }
+                else if (data.open_loop !== undefined) {
+                    updateOpenLoopDisplay(data.open_loop);
+                }
+                else if (data.encoder_fault !== undefined) {
+                    console.warn('Encoder fault:', data);
+                    document.getElementById('focStatus').textContent = 'Encoder Fault';
+                }
+                else if (data.phase_map !== undefined) {
+                    updatePhaseMapDisplay(data.phase_map);
+                }
+                else if (data.vector_test !== undefined) {
+                    updateVectorTestDisplay(data.vector_test);
+                }
+                else if (data.modulation !== undefined) {
+                    updateModulationDisplay(data.modulation);
                 } else {
                     console.log('Unknown JSON:', data);
                 }
@@ -291,6 +307,11 @@ function updateDiagnosticDisplay(diagData) {
     }
 }
 
+function updateOpenLoopDisplay(openLoopData) {
+    document.getElementById('focStatus').textContent = 'Open Loop';
+    console.log('Open-loop mode:', openLoopData);
+}
+
 /**
  * Update connection status UI
  * @param {Boolean} connected - Current connection state
@@ -358,6 +379,52 @@ async function setVelocity() {
 
     const command = `SET_VELOCITY:${velocity.toFixed(2)}`;
     await sendCommand(command);
+}
+
+async function startOpenLoop() {
+    await sendCommand('START_OPENLOOP');
+}
+
+async function setPhaseMap() {
+    const select = document.getElementById('phaseMapSelect');
+    const phaseMap = parseInt(select.value, 10);
+    await sendCommand(`SET_PHASE_MAP:${phaseMap}`);
+}
+
+async function startVectorTest() {
+    const select = document.getElementById('vectorTestSelect');
+    const vectorIndex = parseInt(select.value, 10);
+    await sendCommand(`TEST_VECTOR:${vectorIndex}`);
+}
+
+async function setModulation() {
+    const select = document.getElementById('modulationSelect');
+    await sendCommand(`SET_MODULATION:${select.value}`);
+}
+
+function updatePhaseMapDisplay(phaseMap) {
+    const select = document.getElementById('phaseMapSelect');
+    if (select) {
+        select.value = String(phaseMap);
+    }
+    console.log('Phase map set to:', phaseMap);
+}
+
+function updateVectorTestDisplay(vectorTest) {
+    const select = document.getElementById('vectorTestSelect');
+    if (select && vectorTest.index !== undefined) {
+        select.value = String(vectorTest.index);
+    }
+    document.getElementById('focStatus').textContent = 'Vector Test';
+    console.log('Vector test:', vectorTest);
+}
+
+function updateModulationDisplay(modulation) {
+    const select = document.getElementById('modulationSelect');
+    if (select) {
+        select.value = modulation;
+    }
+    console.log('Modulation set to:', modulation);
 }
 
 /**

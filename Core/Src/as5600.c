@@ -1,15 +1,17 @@
 #include "as5600.h"
+#include "i2c.h"
 #include <math.h>
-
-extern I2C_HandleTypeDef hi2c1;
 
 #define AS5600_ADDR  (0x36 << 1)
 #define AS5600_ANGLE 0x0C
 #define AS5600_LSB_RAD      (2.0f * (float)M_PI / 4096.0f)
 #define AS5600_SAMPLE_INTERVAL_MS 2U
 #define AS5600_RETRY_DELAY_MS     2U
-#define AS5600_VEL_MIN_MS   5U
-#define AS5600_VEL_DEADBAND (2.0f * AS5600_LSB_RAD)
+#define AS5600_VEL_MIN_MS   20U
+#define AS5600_VEL_DEADBAND (4.0f * AS5600_LSB_RAD)
+#define AS5600_VEL_FILTER_ALPHA 0.1f
+#define AS5600_HEALTH_TIMEOUT_MS 100U
+#define AS5600_RESET_THRESHOLD   8U
 
 uint8_t AS5600_dma_buf[2];
 volatile uint16_t AS5600_raw_angle = 0;
@@ -28,6 +30,21 @@ static volatile uint8_t as5600_error_pending = 0;
 static volatile uint16_t as5600_pending_raw_angle = 0;
 static uint32_t as5600_next_start_ms = 0;
 static float as5600_last_velocity_mech = 0.0f;
+static uint32_t as5600_last_callback_snapshot = 0;
+static uint32_t as5600_consecutive_start_failures = 0;
+static uint32_t as5600_consecutive_error_callbacks = 0;
+
+static void AS5600_ResetBus(void) {
+    if (hi2c1.hdmarx != NULL) {
+        HAL_DMA_Abort(hi2c1.hdmarx);
+    }
+    HAL_I2C_DeInit(&hi2c1);
+    MX_I2C1_Init();
+    __HAL_I2C_ENABLE(&hi2c1);
+    as5600_dma_inflight = 0U;
+    as5600_error_pending = 0U;
+    as5600_next_start_ms = HAL_GetTick() + AS5600_RETRY_DELAY_MS;
+}
 
 static void AS5600_TryStartTransfer(uint32_t now_ms) {
     if (as5600_dma_inflight != 0U) {
@@ -45,10 +62,18 @@ static void AS5600_TryStartTransfer(uint32_t now_ms) {
                              AS5600_dma_buf,
                              2) == HAL_OK) {
         AS5600_dma_starts++;
+        as5600_consecutive_start_failures = 0U;
         as5600_dma_inflight = 1U;
         as5600_next_start_ms = now_ms + AS5600_SAMPLE_INTERVAL_MS;
     } else {
         AS5600_dma_errors++;
+        as5600_consecutive_start_failures++;
+        if (as5600_consecutive_start_failures >= AS5600_RESET_THRESHOLD) {
+            as5600_consecutive_start_failures = 0U;
+            as5600_consecutive_error_callbacks = 0U;
+            AS5600_ResetBus();
+            return;
+        }
         __HAL_I2C_ENABLE(&hi2c1);
         as5600_next_start_ms = now_ms + AS5600_RETRY_DELAY_MS;
     }
@@ -62,6 +87,7 @@ static void AS5600_ProcessPendingSample(void) {
     as5600_sample_ready = 0U;
     AS5600_raw_angle = as5600_pending_raw_angle;
     AS5600_dma_callbacks++;
+    as5600_consecutive_error_callbacks = 0U;
 
     float new_mech = (float)AS5600_raw_angle * AS5600_LSB_RAD;
     uint32_t now_ms = HAL_GetTick();
@@ -78,8 +104,9 @@ static void AS5600_ProcessPendingSample(void) {
                 delta = 0.0f;
             }
 
-            float inst_vel = -delta / dt;
-            AS5600_velocity = 0.8f * AS5600_velocity + 0.2f * inst_vel;
+            float inst_vel = delta / dt;
+            AS5600_velocity = (1.0f - AS5600_VEL_FILTER_ALPHA) * AS5600_velocity +
+                              AS5600_VEL_FILTER_ALPHA * inst_vel;
 
             if (fabsf(AS5600_velocity) < 0.05f) {
                 AS5600_velocity = 0.0f;
@@ -109,6 +136,12 @@ void AS5600_Service(void) {
 
     if (as5600_error_pending != 0U) {
         as5600_error_pending = 0U;
+        if (as5600_consecutive_error_callbacks >= AS5600_RESET_THRESHOLD) {
+            as5600_consecutive_error_callbacks = 0U;
+            as5600_consecutive_start_failures = 0U;
+            AS5600_ResetBus();
+            return;
+        }
         __HAL_I2C_ENABLE(&hi2c1);
     }
 
@@ -136,10 +169,38 @@ void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
         AS5600_dma_errors++;
         as5600_dma_inflight = 0U;
         as5600_error_pending = 1U;
+        as5600_consecutive_error_callbacks++;
         as5600_next_start_ms = HAL_GetTick() + AS5600_RETRY_DELAY_MS;
     }
 }
 
 float AS5600_GetMechanicalAngle(void) {
     return (float)AS5600_raw_angle * AS5600_LSB_RAD;
+}
+
+uint8_t AS5600_IsHealthy(void) {
+    if (AS5600_dma_callbacks == 0U) {
+        return 0U;
+    }
+
+    if ((HAL_GetTick() - AS5600_last_update_ms) > AS5600_HEALTH_TIMEOUT_MS) {
+        return 0U;
+    }
+
+    return 1U;
+}
+
+uint8_t AS5600_WaitForHealthy(uint32_t timeout_ms) {
+    uint32_t start = HAL_GetTick();
+    as5600_last_callback_snapshot = AS5600_dma_callbacks;
+
+    while ((HAL_GetTick() - start) < timeout_ms) {
+        AS5600_Service();
+        if ((AS5600_dma_callbacks != as5600_last_callback_snapshot) && AS5600_IsHealthy()) {
+            return 1U;
+        }
+        HAL_Delay(1);
+    }
+
+    return 0U;
 }
