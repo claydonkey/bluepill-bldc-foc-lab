@@ -198,6 +198,11 @@ void set_voltage_limit(float uq_limit)
 {
 	FOC_SetVoltageLimit(uq_limit);
 }
+
+void set_low_speed_feedforward(float voltage, float fade_speed)
+{
+	FOC_SetLowSpeedFeedforward(voltage, fade_speed);
+}
 /* USER CODE END 0 */
 
 /**
@@ -555,6 +560,38 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		if (len > 0 && len < (int)sizeof(limit_msg))
 		{
 			CDC_Transmit_FS((uint8_t *)limit_msg, len);
+		}
+	}
+	else if (strncmp(command, "GET_FEEDFORWARD", 15) == 0)
+	{
+		float ff_voltage;
+		float ff_fade_speed;
+		FOC_GetLowSpeedFeedforward(&ff_voltage, &ff_fade_speed);
+
+		char ff_msg[96];
+		int len = snprintf(ff_msg, sizeof(ff_msg),
+											 "{\"feedforward\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n",
+											 ff_voltage, ff_fade_speed);
+		if (len > 0 && len < (int)sizeof(ff_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)ff_msg, len);
+		}
+	}
+	else if (strncmp(command, "SET_FEEDFORWARD:", 16) == 0)
+	{
+		float ff_voltage, ff_fade_speed;
+		if (sscanf(command + 16, "%f,%f", &ff_voltage, &ff_fade_speed) == 2)
+		{
+			set_low_speed_feedforward(ff_voltage, ff_fade_speed);
+
+			char ff_msg[96];
+			int len = snprintf(ff_msg, sizeof(ff_msg),
+												 "{\"feedforward\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n",
+												 ff_voltage, ff_fade_speed);
+			if (len > 0 && len < (int)sizeof(ff_msg))
+			{
+				CDC_Transmit_FS((uint8_t *)ff_msg, len);
+			}
 		}
 	}
 	else if (strncmp(command, "SET_PID:", 8) == 0)

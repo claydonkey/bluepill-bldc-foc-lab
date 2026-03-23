@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -55,7 +56,8 @@
             letter-spacing: -0.04em;
         }
 
-        h2, h3 {
+        h2,
+        h3 {
             color: var(--text);
         }
 
@@ -146,9 +148,12 @@
         }
 
         @keyframes pulse {
-            0%, 100% {
+
+            0%,
+            100% {
                 opacity: 1;
             }
+
             50% {
                 opacity: 0.5;
             }
@@ -343,6 +348,67 @@
             line-height: 1.45;
         }
 
+        .plot-panel {
+            display: grid;
+            gap: 12px;
+        }
+
+        .plot-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        .plot-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+        }
+
+        .plot-badge-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, #14b8a6 0%, #2563eb 100%);
+        }
+
+        .plot-frame {
+            position: relative;
+            background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 12px;
+            overflow: hidden;
+        }
+
+        .plot-frame::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(to right, rgba(148, 163, 184, 0.14) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(148, 163, 184, 0.14) 1px, transparent 1px);
+            background-size: 12.5% 25%;
+            pointer-events: none;
+        }
+
+        .plot-canvas {
+            position: relative;
+            display: block;
+            width: 100%;
+            height: 220px;
+            border-radius: 12px;
+        }
+
+
         @media (max-width: 920px) {
             .page-grid {
                 grid-template-columns: 1fr;
@@ -371,6 +437,7 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="hero">
@@ -379,7 +446,8 @@
                     Motor Control Dashboard
                     <span class="connection-status disconnected" id="connectionStatus"></span>
                 </h1>
-                <p>Drive the Blue Pill controller, compare measured behavior with commanded behavior, and jump quickly between closed-loop, open-loop, vector, and phase-map tests.</p>
+                <p>Drive the Blue Pill controller, compare measured behavior with commanded behavior, and jump quickly
+                    between closed-loop, open-loop, vector, and phase-map tests.</p>
             </div>
         </div>
 
@@ -427,42 +495,63 @@
 
                 <div class="panel">
                     <div class="panel-header">
+                        <h2>Velocity Trace</h2>
+                    </div>
+                    <div class="plot-panel">
+                        <div class="plot-meta">
+                            <span class="plot-badge">
+                                <span class="plot-badge-dot"></span>
+                                <span>Actual velocity history</span>
+                            </span>
+                            <span id="velocityPlotMeta">Window: 0 samples | Scale: ±0.50 rad/s</span>
+                        </div>
+                        <div class="plot-frame">
+                            <canvas id="velocityPlot" class="plot-canvas" width="640" height="220"></canvas>
+                        </div>
+                        <div class="subtle-note">
+                            Rolling trace of measured velocity from FOC telemetry.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
                         <h2>FOC Debug</h2>
                     </div>
                     <div class="debug-grid">
-                <div class="debug-item">
-                    <span class="debug-label">Target Velocity:</span>
-                    <span class="debug-value" id="debugTarget">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">Actual Velocity:</span>
-                    <span class="debug-value" id="debugActual">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">Velocity Error:</span>
-                    <span class="debug-value" id="debugError">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">PID Output (Uq):</span>
-                    <span class="debug-value" id="debugUq">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">PWM A:</span>
-                    <span class="debug-value" id="debugPwmA">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">PWM B:</span>
-                    <span class="debug-value" id="debugPwmB">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">PWM C:</span>
-                    <span class="debug-value" id="debugPwmC">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">PWM Period:</span>
-                    <span class="debug-value" id="debugPwmPeriod">—</span>
-                </div>
-            </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Target Velocity:</span>
+                            <span class="debug-value" id="debugTarget">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Actual Velocity:</span>
+                            <span class="debug-value" id="debugActual">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Velocity Error:</span>
+                            <span class="debug-value" id="debugError">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">PID Output (Uq):</span>
+                            <span class="debug-value" id="debugUq">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">PWM A:</span>
+                            <span class="debug-value" id="debugPwmA">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">PWM B:</span>
+                            <span class="debug-value" id="debugPwmB">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">PWM C:</span>
+                            <span class="debug-value" id="debugPwmC">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">PWM Period:</span>
+                            <span class="debug-value" id="debugPwmPeriod">—</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="panel">
@@ -470,42 +559,42 @@
                         <h2>Diagnostics</h2>
                     </div>
                     <div class="debug-grid">
-                <div class="debug-item">
-                    <span class="debug-label">Loop Count:</span>
-                    <span class="debug-value" id="debugLoopCount">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">Messages Sent:</span>
-                    <span class="debug-value" id="debugMessagesSent">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">Messages Failed:</span>
-                    <span class="debug-value" id="debugMessagesFailed">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">Encoder Angle:</span>
-                    <span class="debug-value" id="debugEncoderAngle">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">Encoder DMA Callbacks:</span>
-                    <span class="debug-value" id="debugEncoderCallbacks">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">Callback Rate:</span>
-                    <span class="debug-value" id="debugCallbackRate">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">I2C Errors:</span>
-                    <span class="debug-value" id="debugI2CErrors">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">DMA Starts:</span>
-                    <span class="debug-value" id="debugDMAStarts">—</span>
-                </div>
-                <div class="debug-item">
-                    <span class="debug-label">Motor Running:</span>
-                    <span class="debug-value" id="debugMotorRunning">—</span>
-                </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Loop Count:</span>
+                            <span class="debug-value" id="debugLoopCount">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Messages Sent:</span>
+                            <span class="debug-value" id="debugMessagesSent">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Messages Failed:</span>
+                            <span class="debug-value" id="debugMessagesFailed">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Encoder Angle:</span>
+                            <span class="debug-value" id="debugEncoderAngle">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Encoder DMA Callbacks:</span>
+                            <span class="debug-value" id="debugEncoderCallbacks">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Callback Rate:</span>
+                            <span class="debug-value" id="debugCallbackRate">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">I2C Errors:</span>
+                            <span class="debug-value" id="debugI2CErrors">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">DMA Starts:</span>
+                            <span class="debug-value" id="debugDMAStarts">—</span>
+                        </div>
+                        <div class="debug-item">
+                            <span class="debug-label">Motor Running:</span>
+                            <span class="debug-value" id="debugMotorRunning">—</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -524,14 +613,18 @@
 
                         <div class="stack-label">Speed Command</div>
                         <div class="input-group">
-                            <input type="number" id="velocityInput" placeholder="Enter target velocity (rad/s)" step="0.1" min="-2" max="2" value="0.5">
-                            <button onclick="setVelocity()" style="background: #2563eb; color: white;">Set Velocity</button>
+                            <input type="number" id="velocityInput" placeholder="Enter target velocity (rad/s)"
+                                step="0.1" min="-100" max="100" value="1.0">
+                            <button onclick="setVelocity()" style="background: #2563eb; color: white;">Set
+                                Velocity</button>
                         </div>
 
                         <div class="stack-label">Open-Loop Tools</div>
                         <div class="button-group">
-                            <button onclick="startOpenLoop()" style="background: #d97706; color: white;">Start Open Loop</button>
-                            <button onclick="sendCommand('GET_VELOCITY')" style="background: #64748b; color: white;">Refresh Telemetry</button>
+                            <button onclick="startOpenLoop()" style="background: #d97706; color: white;">Start Open
+                                Loop</button>
+                            <button onclick="sendCommand('GET_VELOCITY')"
+                                style="background: #64748b; color: white;">Refresh Telemetry</button>
                         </div>
 
                         <div class="stack-label">Vector Test</div>
@@ -544,7 +637,8 @@
                                 <option value="4">Vector 4</option>
                                 <option value="5">Vector 5</option>
                             </select>
-                            <button onclick="startVectorTest()" style="background: #c2410c; color: white;">Test Vector</button>
+                            <button onclick="startVectorTest()" style="background: #c2410c; color: white;">Test
+                                Vector</button>
                         </div>
 
                         <div class="stack-label">Phase Mapping</div>
@@ -557,7 +651,8 @@
                                 <option value="4">Phase Map 4: C,A,B</option>
                                 <option value="5">Phase Map 5: C,B,A</option>
                             </select>
-                            <button onclick="setPhaseMap()" style="background: #7c3aed; color: white;">Set Phase Map</button>
+                            <button onclick="setPhaseMap()" style="background: #7c3aed; color: white;">Set Phase
+                                Map</button>
                         </div>
 
                         <div class="stack-label">Modulation</div>
@@ -566,12 +661,14 @@
                                 <option value="SVPWM">SVPWM</option>
                                 <option value="SINE" selected>Sine PWM</option>
                             </select>
-                            <button onclick="setModulation()" style="background: #0f766e; color: white;">Set Modulation</button>
+                            <button onclick="setModulation()" style="background: #0f766e; color: white;">Set
+                                Modulation</button>
                         </div>
                     </div>
 
                     <div class="info-box">
-                        <strong>Bring-up workflow:</strong> Start with vector tests, then open loop, then closed loop. If all vector tests feel the same, treat that as a likely hardware or driver-mode issue.
+                        <strong>Bring-up workflow:</strong> Start with vector tests, then open loop, then closed loop.
+                        If all vector tests feel the same, treat that as a likely hardware or driver-mode issue.
                     </div>
                 </div>
 
@@ -581,15 +678,18 @@
                     </div>
                     <div class="debug-grid" style="margin-bottom: 14px;">
                         <div>
-                            <input type="number" id="kpInput" placeholder="Kp" step="0.1" min="0" max="5" value="0.3" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <input type="number" id="kpInput" placeholder="Kp" step="0.1" min="0" max="5" value="0.3"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                             <div class="subtle-note" style="margin-top: 6px;">Proportional</div>
                         </div>
                         <div>
-                            <input type="number" id="kiInput" placeholder="Ki" step="0.1" min="0" max="10" value="1.0" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <input type="number" id="kiInput" placeholder="Ki" step="0.1" min="0" max="10" value="1.0"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                             <div class="subtle-note" style="margin-top: 6px;">Integral</div>
                         </div>
                         <div>
-                            <input type="number" id="kdInput" placeholder="Kd" step="0.01" min="0" max="1" value="0.01" style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <input type="number" id="kdInput" placeholder="Kd" step="0.01" min="0" max="1" value="0.01"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                             <div class="subtle-note" style="margin-top: 6px;">Derivative</div>
                         </div>
                     </div>
@@ -598,10 +698,37 @@
                         <button onclick="getPID()" style="background: #0891b2; color: white;">Get PID</button>
                     </div>
                 </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Torque Assist</h2>
+                    </div>
+                    <div class="debug-grid" style="margin-bottom: 14px;">
+                        <div>
+                            <input type="number" id="feedforwardVoltageInput" placeholder="Feedforward Voltage"
+                                step="0.1" min="0" max="6" value="0.8"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <div class="subtle-note" style="margin-top: 6px;">Low-speed feedforward voltage</div>
+                        </div>
+                        <div>
+                            <input type="number" id="feedforwardFadeInput" placeholder="Fade Speed" step="0.1" min="0.1"
+                                max="20" value="3.0"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <div class="subtle-note" style="margin-top: 6px;">Fade out by this speed (rad/s)</div>
+                        </div>
+                    </div>
+                    <div class="button-group" style="margin-bottom: 0;">
+                        <button onclick="setFeedforward()" style="background: #ea580c; color: white;">Set
+                            Feedforward</button>
+                        <button onclick="getFeedforward()" style="background: #475569; color: white;">Get
+                            Feedforward</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
     <script src="app.js"></script>
 </body>
+
 </html>

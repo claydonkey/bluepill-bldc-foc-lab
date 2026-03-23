@@ -10,6 +10,8 @@ extern TIM_HandleTypeDef htim1;
 #define POLE_PAIRS 7 // 2804 motor: 14 poles = 7 pole pairs
 #define VBUS 12.0f
 #define FOC_DEFAULT_UQ_VOLTAGE_LIMIT (VBUS * 0.48f)
+#define FOC_DEFAULT_LOW_SPEED_FF_VOLTAGE 0.8f
+#define FOC_DEFAULT_LOW_SPEED_FF_FADE_SPEED 3.0f
 
 ControlMode_t control_mode = MODE_VELOCITY;
 ModulationMode_t modulation_mode = MODULATION_SINE;
@@ -36,6 +38,8 @@ static float open_loop_theta_e = 0.0f;
 static float open_loop_electrical_velocity = 0.0f;
 static float open_loop_uq_voltage = 0.0f;
 static float uq_voltage_limit = FOC_DEFAULT_UQ_VOLTAGE_LIMIT;
+static float low_speed_ff_voltage = FOC_DEFAULT_LOW_SPEED_FF_VOLTAGE;
+static float low_speed_ff_fade_speed = FOC_DEFAULT_LOW_SPEED_FF_FADE_SPEED;
 static uint8_t phase_map = 0U;
 static uint8_t vector_test_index = 0U;
 static float vector_test_uq_voltage = 0.0f;
@@ -136,6 +140,42 @@ void FOC_SetVoltageLimit(float uq_limit)
 float FOC_GetVoltageLimit(void)
 {
     return uq_voltage_limit;
+}
+
+void FOC_SetLowSpeedFeedforward(float voltage, float fade_speed)
+{
+    if (voltage < 0.0f)
+    {
+        voltage = 0.0f;
+    }
+    else if (voltage > uq_voltage_limit)
+    {
+        voltage = uq_voltage_limit;
+    }
+
+    if (fade_speed < 0.1f)
+    {
+        fade_speed = 0.1f;
+    }
+    else if (fade_speed > 20.0f)
+    {
+        fade_speed = 20.0f;
+    }
+
+    low_speed_ff_voltage = voltage;
+    low_speed_ff_fade_speed = fade_speed;
+}
+
+void FOC_GetLowSpeedFeedforward(float *voltage, float *fade_speed)
+{
+    if (voltage != NULL)
+    {
+        *voltage = low_speed_ff_voltage;
+    }
+    if (fade_speed != NULL)
+    {
+        *fade_speed = low_speed_ff_fade_speed;
+    }
 }
 
 void FOC_StartOpenLoop(float electrical_velocity, float uq_voltage)
@@ -288,6 +328,24 @@ static float wrapped_angle_delta(float current, float previous)
         delta += 2.0f * (float)M_PI;
     }
     return delta;
+}
+
+static float compute_low_speed_feedforward(float target_vel)
+{
+    float abs_target = fabsf(target_vel);
+    if ((abs_target < 0.01f) || (low_speed_ff_voltage <= 0.0f))
+    {
+        return 0.0f;
+    }
+
+    if (abs_target >= low_speed_ff_fade_speed)
+    {
+        return 0.0f;
+    }
+
+    float scale = 1.0f - (abs_target / low_speed_ff_fade_speed);
+    float direction = (target_vel >= 0.0f) ? 1.0f : -1.0f;
+    return direction * low_speed_ff_voltage * scale;
 }
 
 static void apply_d_axis_vector(float theta_e, float U)
@@ -510,6 +568,16 @@ void FOC_Loop(void)
     {
         err = target_velocity - velocity;
         Uq = PID_compute(&vel_pid, err, dt); // Negate PID output to correct direction
+        Uq += compute_low_speed_feedforward(target_velocity);
+
+        if (Uq > uq_voltage_limit)
+        {
+            Uq = uq_voltage_limit;
+        }
+        else if (Uq < -uq_voltage_limit)
+        {
+            Uq = -uq_voltage_limit;
+        }
 
         // Safety: if target is 0 and error is small, reset PID to prevent drift
         if (fabsf(target_velocity) < 0.01f && fabsf(err) < 0.1f)
@@ -524,6 +592,15 @@ void FOC_Loop(void)
         float vel_target = PID_compute(&pos_pid, pos_err, dt);
         float vel_err = vel_target - velocity;
         Uq = PID_compute(&vel_pid, vel_err, dt); // Negate PID output
+        Uq += compute_low_speed_feedforward(vel_target);
+        if (Uq > uq_voltage_limit)
+        {
+            Uq = uq_voltage_limit;
+        }
+        else if (Uq < -uq_voltage_limit)
+        {
+            Uq = -uq_voltage_limit;
+        }
         err = vel_err;                           // For debug purposes
     }
 

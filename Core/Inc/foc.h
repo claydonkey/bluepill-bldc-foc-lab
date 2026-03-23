@@ -55,6 +55,8 @@ void FOC_GetPID(float *Kp, float *Ki, float *Kd);
 void FOC_ResetPID(void); // Reset PID integral and previous error
 void FOC_SetVoltageLimit(float uq_limit);
 float FOC_GetVoltageLimit(void);
+void FOC_SetLowSpeedFeedforward(float voltage, float fade_speed);
+void FOC_GetLowSpeedFeedforward(float *voltage, float *fade_speed);
 
 // Motor tuning parameters (for 2804: 14 poles = 7 pole pairs)
 #define MOTOR_POLE_PAIRS 7

@@ -15,7 +15,9 @@ const state = {
     port: null,
     reader: null,
     isConnected: false,
-    inputBuffer: ''
+    inputBuffer: '',
+    velocityHistory: [],
+    velocityHistoryLimit: 120
 };
 
 /**
@@ -25,14 +27,14 @@ async function connectSerialPort() {
     try {
         // Request a port from the user
         state.port = await navigator.serial.requestPort();
-        
+
         // Open the port at 115200 baud (or adjust to your MCU's baud rate)
         await state.port.open({ baudRate: 115200 });
-        
+
         state.isConnected = true;
         updateConnectionStatus(true);
         console.log('Connected to serial port');
-        
+
         // Start reading data
         readSerialData();
     } catch (error) {
@@ -87,7 +89,7 @@ function processInputBuffer() {
             // Try to parse as JSON
             if (line.startsWith('{')) {
                 const data = JSON.parse(line);
-                
+
                 // Check for velocity telemetry
                 if (data.vel !== undefined) {
                     updateVelocityDisplay(data);
@@ -132,6 +134,9 @@ function processInputBuffer() {
                 }
                 else if (data.modulation !== undefined) {
                     updateModulationDisplay(data.modulation);
+                }
+                else if (data.feedforward !== undefined) {
+                    updateFeedforwardDisplay(data.feedforward);
                 } else {
                     console.log('Unknown JSON:', data);
                 }
@@ -158,9 +163,11 @@ function updateVelocityDisplay(data) {
     if (data.vel !== undefined) {
         const velocity = parseFloat(data.vel).toFixed(2);
         document.getElementById('velocity').textContent = velocity;
+        pushVelocitySample(parseFloat(data.vel));
     } else if (data.v !== undefined) {
         const velocity = parseFloat(data.v).toFixed(2);
         document.getElementById('velocity').textContent = velocity;
+        pushVelocitySample(parseFloat(data.v));
     }
 
     if (data.target !== undefined) {
@@ -221,38 +228,38 @@ function updateTargetVelocityDisplay(data) {
 function updateFOCDebugDisplay(focData) {
     // Handle abbreviated field names from firmware (v, t, lc, r, err, uq, pwm)
     // and full field names (vel, target, velocity, error, etc.)
-    
+
     // Target velocity
     if (focData.target !== undefined) {
         document.getElementById('debugTarget').textContent = parseFloat(focData.target).toFixed(3);
     } else if (focData.t !== undefined) {
         document.getElementById('debugTarget').textContent = parseFloat(focData.t).toFixed(3);
     }
-    
+
     // Actual velocity
     if (focData.vel !== undefined) {
         document.getElementById('debugActual').textContent = parseFloat(focData.vel).toFixed(3);
     } else if (focData.v !== undefined) {
         document.getElementById('debugActual').textContent = parseFloat(focData.v).toFixed(3);
     }
-    
+
     // Velocity error
     if (focData.err !== undefined) {
         document.getElementById('debugError').textContent = parseFloat(focData.err).toFixed(3);
     }
-    
+
     // PID output (Q-axis voltage)
     if (focData.uq !== undefined) {
         document.getElementById('debugUq').textContent = parseFloat(focData.uq).toFixed(3);
     }
-    
+
     // PWM duty cycles
     if (focData.pwm && Array.isArray(focData.pwm) && focData.pwm.length >= 3) {
         document.getElementById('debugPwmA').textContent = focData.pwm[0];
         document.getElementById('debugPwmB').textContent = focData.pwm[1];
         document.getElementById('debugPwmC').textContent = focData.pwm[2];
     }
-    
+
     // PWM period
     if (focData.per !== undefined) {
         document.getElementById('debugPwmPeriod').textContent = focData.per;
@@ -359,6 +366,8 @@ async function sendCommand(command) {
             document.getElementById('debugPwmA').textContent = '—';
             document.getElementById('debugPwmB').textContent = '—';
             document.getElementById('debugPwmC').textContent = '—';
+            state.velocityHistory = [];
+            drawVelocityPlot();
         }
     } catch (error) {
         console.error('Failed to send command:', error);
@@ -372,8 +381,8 @@ async function setVelocity() {
     const input = document.getElementById('velocityInput');
     const velocity = parseFloat(input.value);
 
-    if (isNaN(velocity) || velocity < -2 || velocity > 2) {
-        alert('Please enter a valid velocity between -2 and 2 rad/s');
+    if (isNaN(velocity) || velocity < -100 || velocity > 100) {
+        alert('Please enter a valid velocity between -100 and 100 rad/s');
         return;
     }
 
@@ -427,6 +436,101 @@ function updateModulationDisplay(modulation) {
     console.log('Modulation set to:', modulation);
 }
 
+function updateFeedforwardDisplay(feedforward) {
+    if (feedforward.voltage !== undefined) {
+        document.getElementById('feedforwardVoltageInput').value = parseFloat(feedforward.voltage).toFixed(2);
+    }
+    if (feedforward.fade_speed !== undefined) {
+        document.getElementById('feedforwardFadeInput').value = parseFloat(feedforward.fade_speed).toFixed(2);
+    }
+    console.log('Feedforward updated:', feedforward);
+}
+
+function pushVelocitySample(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+
+    state.velocityHistory.push(value);
+    if (state.velocityHistory.length > state.velocityHistoryLimit) {
+        state.velocityHistory.shift();
+    }
+    drawVelocityPlot();
+}
+
+function drawVelocityPlot() {
+    const canvas = document.getElementById('velocityPlot');
+    const meta = document.getElementById('velocityPlotMeta');
+    if (!canvas || !meta) {
+        return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    const width = canvas.width;
+    const height = canvas.height;
+    const paddingX = 14;
+    const paddingY = 16;
+    const innerWidth = width - (paddingX * 2);
+    const innerHeight = height - (paddingY * 2);
+    const zeroY = paddingY + (innerHeight * 0.5);
+    const history = state.velocityHistory;
+    const maxAbs = history.length > 0 ? Math.max(0.5, ...history.map(sample => Math.abs(sample))) : 0.5;
+
+    ctx.clearRect(0, 0, width, height);
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+        const y = paddingY + (innerHeight * i / 4);
+        ctx.beginPath();
+        ctx.moveTo(paddingX, y);
+        ctx.lineTo(width - paddingX, y);
+        ctx.stroke();
+    }
+
+    ctx.strokeStyle = 'rgba(37, 99, 235, 0.75)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(paddingX, zeroY);
+    ctx.lineTo(width - paddingX, zeroY);
+    ctx.stroke();
+
+    if (history.length > 1) {
+        const gradient = ctx.createLinearGradient(0, 0, width, 0);
+        gradient.addColorStop(0, '#14b8a6');
+        gradient.addColorStop(1, '#2563eb');
+
+        ctx.strokeStyle = gradient;
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+
+        history.forEach((sample, index) => {
+            const x = paddingX + (innerWidth * index / (state.velocityHistoryLimit - 1));
+            const y = zeroY - ((sample / maxAbs) * (innerHeight * 0.45));
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+
+        const lastValue = history[history.length - 1];
+        const lastX = paddingX + (innerWidth * (history.length - 1) / (state.velocityHistoryLimit - 1));
+        const lastY = zeroY - ((lastValue / maxAbs) * (innerHeight * 0.45));
+        ctx.fillStyle = '#0f766e';
+        ctx.beginPath();
+        ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
+    meta.textContent = `Window: ${history.length} samples | Scale: ±${maxAbs.toFixed(2)} rad/s`;
+}
+
 /**
  * Set PID parameters via USB
  */
@@ -449,6 +553,22 @@ async function setPID() {
  */
 async function getPID() {
     await sendCommand('GET_PID');
+}
+
+async function setFeedforward() {
+    const voltage = parseFloat(document.getElementById('feedforwardVoltageInput').value);
+    const fadeSpeed = parseFloat(document.getElementById('feedforwardFadeInput').value);
+
+    if (isNaN(voltage) || isNaN(fadeSpeed) || voltage < 0 || voltage > 6 || fadeSpeed < 0.1 || fadeSpeed > 20) {
+        alert('Please enter feedforward values within the allowed ranges');
+        return;
+    }
+
+    await sendCommand(`SET_FEEDFORWARD:${voltage.toFixed(2)},${fadeSpeed.toFixed(2)}`);
+}
+
+async function getFeedforward() {
+    await sendCommand('GET_FEEDFORWARD');
 }
 
 /**
@@ -475,7 +595,7 @@ async function disconnectSerialPort() {
 /**
  * Initialize connection button listener
  */
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     // Add connection button
     const header = document.querySelector('h1');
     const connectBtn = document.createElement('button');
@@ -499,6 +619,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const container = document.querySelector('.container');
     container.style.position = 'relative';
     container.insertBefore(connectBtn, container.firstChild);
+
+    drawVelocityPlot();
 
     console.log('Dashboard initialized. Click "Connect Serial Port" to start.');
 });
