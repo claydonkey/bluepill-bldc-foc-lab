@@ -385,6 +385,50 @@
             min-width: 100px;
         }
 
+        .range-stack {
+            display: grid;
+            gap: 10px;
+        }
+
+        .range-input {
+            width: 100%;
+            height: 12px;
+            appearance: none;
+            border-radius: 999px;
+            background: linear-gradient(90deg, rgba(37, 99, 235, 0.16) 0%, rgba(20, 184, 166, 0.18) 100%);
+            outline: none;
+        }
+
+        .range-input::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--accent-2) 0%, #38bdf8 100%);
+            border: 2px solid #fff;
+            box-shadow: 0 6px 14px rgba(37, 99, 235, 0.24);
+            cursor: pointer;
+        }
+
+        .range-input::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--accent-2) 0%, #38bdf8 100%);
+            border: 2px solid #fff;
+            box-shadow: 0 6px 14px rgba(37, 99, 235, 0.24);
+            cursor: pointer;
+        }
+
+        .range-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--muted);
+            font-size: 0.8rem;
+            letter-spacing: 0.02em;
+        }
+
         .btn-primary {
             background: linear-gradient(145deg, var(--accent-2) 0%, #38bdf8 100%);
             color: white;
@@ -768,17 +812,33 @@
                         </div>
 
                         <div class="stack-label">Speed Command</div>
+                        <div class="range-stack" style="margin-bottom: 12px;">
+                            <input type="range" id="velocitySlider" class="range-input" min="-100" max="100" step="0.1"
+                                value="1.0" oninput="syncVelocityFromSlider()">
+                            <div class="range-meta">
+                                <span>-100 rad/s</span>
+                                <span>100 rad/s</span>
+                            </div>
+                        </div>
                         <div class="input-group">
                             <input type="number" id="velocityInput" placeholder="Enter target velocity (rad/s)"
-                                step="0.1" min="-100" max="100" value="1.0">
+                                step="0.1" min="-100" max="100" value="1.0" oninput="syncVelocityFromInput()">
                             <button class="btn-primary" onclick="setVelocity()">Set
                                 Velocity</button>
                         </div>
 
                         <div class="stack-label">Position Command</div>
+                        <div class="range-stack" style="margin-bottom: 12px;">
+                            <input type="range" id="positionSlider" class="range-input" min="-31.416" max="31.416" step="0.01"
+                                value="0.0" oninput="syncPositionFromSlider()">
+                            <div class="range-meta">
+                                <span>-10π rad</span>
+                                <span>+10π rad</span>
+                            </div>
+                        </div>
                         <div class="input-group">
                             <input type="number" id="positionInput" placeholder="Enter target position (rad)"
-                                step="0.1" min="-1000" max="1000" value="0.0">
+                                step="0.1" min="-1000" max="1000" value="0.0" oninput="syncPositionFromInput()">
                             <button class="btn-primary" onclick="setPosition()">Set
                                 Position</button>
                             <button class="btn-secondary" onclick="getPosition()">Get
@@ -844,13 +904,85 @@
                         <button class="btn-warm" onclick="startAutotune()">Start Autotune</button>
                         <button class="btn-outline" onclick="applyAutotuneResults()">Apply Suggested</button>
                     </div>
+                    <div class="stack-label" style="margin-top: 16px;">Position Loop</div>
+                    <div class="debug-item" style="margin-bottom: 14px;">
+                        <span class="debug-label">Position Autotune:</span>
+                        <span class="debug-value" id="positionAutotuneStatus">Idle</span>
+                    </div>
+                    <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(3, minmax(0, 1fr));">
+                        <div>
+                            <input type="number" id="posKpInput" placeholder="Pos Kp" step="0.1" min="0" max="50" value="20.0"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <div class="subtle-note" style="margin-top: 6px;">Position Kp</div>
+                        </div>
+                        <div>
+                            <input type="number" id="posKiInput" placeholder="Pos Ki" step="0.01" min="0" max="10" value="0.0"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <div class="subtle-note" style="margin-top: 6px;">Position Ki</div>
+                        </div>
+                        <div>
+                            <input type="number" id="posKdInput" placeholder="Pos Kd" step="0.01" min="0" max="5" value="0.0"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <div class="subtle-note" style="margin-top: 6px;">Position Kd</div>
+                        </div>
+                    </div>
+                    <div class="button-group" style="margin-bottom: 0;">
+                        <button class="btn-primary" onclick="setPositionPID()">Set Position PID</button>
+                        <button class="btn-secondary" onclick="getPositionPID()">Get Position PID</button>
+                    </div>
+                    <div class="button-group" style="margin-top: 12px; margin-bottom: 0;">
+                        <button class="btn-warm" onclick="startPositionAutotune()">Start Position Autotune</button>
+                        <div></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Motion Profile</h2>
+                    </div>
+                    <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: start;">
+                        <div>
+                            <input type="number" id="velocityRampInput" placeholder="Velocity Ramp" step="0.5" min="0.1"
+                                max="200" value="10.0"
+                                oninput="markDirty(this)"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <div class="subtle-note" style="margin-top: 6px;">Velocity ramp limit (rad/s²)</div>
+                        </div>
+                        <div>
+                            <input type="number" id="positionVelocityLimitInput" placeholder="Position Velocity Limit"
+                                step="0.5" min="0.2" max="100" value="40.0"
+                                oninput="markDirty(this)"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <div class="subtle-note" style="margin-top: 6px;">Max inner speed in position mode (rad/s)</div>
+                        </div>
+                        <div>
+                            <input type="number" id="positionAccelLimitInput" placeholder="Position Accel Limit"
+                                step="0.5" min="0.1" max="400" value="30.0"
+                                oninput="markDirty(this)"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <div class="subtle-note" style="margin-top: 6px;">Position accel limit (rad/s²)</div>
+                        </div>
+                        <div>
+                            <input type="number" id="positionDecelLimitInput" placeholder="Position Decel Limit"
+                                step="0.5" min="0.1" max="400" value="90.0"
+                                oninput="markDirty(this)"
+                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                            <div class="subtle-note" style="margin-top: 6px;">Position decel limit (rad/s²)</div>
+                        </div>
+                        <div style="display: flex; justify-content: center; padding-top: 2px;">
+                            <button class="btn-primary" onclick="setMotionProfile()">Set</button>
+                        </div>
+                        <div style="display: flex; justify-content: center; padding-top: 2px;">
+                            <button class="btn-secondary" onclick="getMotionProfile()">Get</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="panel">
                     <div class="panel-header">
                         <h2>Torque Assist</h2>
                     </div>
-                    <div class="debug-grid" style="margin-bottom: 14px;">
+                    <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
                         <div>
                             <input type="number" id="feedforwardVoltageInput" placeholder="Feedforward Voltage"
                                 step="0.1" min="0" max="6" value="0.8"
@@ -865,10 +997,8 @@
                         </div>
                     </div>
                     <div class="button-group" style="margin-bottom: 0;">
-                        <button class="btn-accent" onclick="setFeedforward()">Set
-                            Feedforward</button>
-                        <button class="btn-secondary" onclick="getFeedforward()">Get
-                            Feedforward</button>
+                        <button class="btn-accent" onclick="setFeedforward()">Set Feedforward</button>
+                        <button class="btn-secondary" onclick="getFeedforward()">Get Feedforward</button>
                     </div>
                 </div>
 
@@ -900,6 +1030,25 @@
                                 </select>
                                 <button class="btn-secondary" onclick="setPhaseMap()">Set Phase
                                     Map</button>
+                            </div>
+                            <div class="stack-label" style="margin-bottom: 8px;">Low-Speed Bias</div>
+                            <div class="debug-grid" style="margin-bottom: 12px; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                                <div>
+                                    <input type="number" id="lowSpeedBiasVoltageInput" placeholder="Bias Voltage"
+                                        step="0.05" min="0" max="6" value="0.35"
+                                        style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                    <div class="subtle-note" style="margin-top: 6px;">Extra low-speed torque bias (V)</div>
+                                </div>
+                                <div>
+                                    <input type="number" id="lowSpeedBiasFadeInput" placeholder="Bias Fade Speed"
+                                        step="0.1" min="0.1" max="20" value="1.5"
+                                        style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                    <div class="subtle-note" style="margin-top: 6px;">Fade out by this speed (rad/s)</div>
+                                </div>
+                            </div>
+                            <div class="button-group" style="margin-bottom: 18px;">
+                                <button class="btn-accent" onclick="setLowSpeedBias()">Set Bias</button>
+                                <button class="btn-secondary" onclick="getLowSpeedBias()">Get Bias</button>
                             </div>
                             <div class="debug-grid">
                                 <div class="debug-item">

@@ -20,12 +20,18 @@ typedef struct {
     float velocity;
     float mechanical_angle;
     float target_velocity;
+    float ramped_velocity_target;
     float target_position;
     float velocity_error;
     float uq_voltage;
     float alignment_offset;
     float sensor_direction;
     float voltage_limit;
+    float velocity_ramp_rate;
+    float position_velocity_limit;
+    float position_accel_limit;
+    float position_decel_limit;
+    float position_torque_assist;
     uint32_t loop_count;
     uint32_t messages_sent;
     uint32_t messages_failed;
@@ -54,6 +60,7 @@ extern volatile uint8_t motor_running;
 
 // Getter function for current velocity (for telemetry over USB)
 float FOC_GetVelocity(void);
+float FOC_GetMechanicalPosition(void);
 
 // Getter function for alignment offset
 float FOC_GetAlignmentOffset(void);
@@ -62,11 +69,26 @@ float FOC_GetSensorDirection(void);
 // PID parameter getters and setters
 void FOC_SetPID(float Kp, float Ki, float Kd);
 void FOC_GetPID(float *Kp, float *Ki, float *Kd);
+void FOC_SetPositionPID(float Kp, float Ki, float Kd);
+void FOC_GetPositionPID(float *Kp, float *Ki, float *Kd);
 void FOC_ResetPID(void); // Reset PID integral and previous error
+void FOC_ResetPIDPreserveRamp(void);
 void FOC_SetVoltageLimit(float uq_limit);
 float FOC_GetVoltageLimit(void);
+void FOC_SetVelocityRamp(float accel_limit);
+float FOC_GetVelocityRamp(void);
+void FOC_SetPositionVelocityLimit(float velocity_limit);
+float FOC_GetPositionVelocityLimit(void);
+void FOC_SetPositionAccelLimit(float accel_limit);
+float FOC_GetPositionAccelLimit(void);
+void FOC_SetPositionDecelLimit(float decel_limit);
+float FOC_GetPositionDecelLimit(void);
 void FOC_SetLowSpeedFeedforward(float voltage, float fade_speed);
 void FOC_GetLowSpeedFeedforward(float *voltage, float *fade_speed);
+void FOC_SetLowSpeedBias(float voltage, float fade_speed);
+void FOC_GetLowSpeedBias(float *voltage, float *fade_speed);
+void FOC_SetPositionTorqueAssist(float voltage);
+float FOC_GetPositionTorqueAssist(void);
 
 // Motor tuning parameters (for 2804: 14 poles = 7 pole pairs)
 #define MOTOR_POLE_PAIRS 7

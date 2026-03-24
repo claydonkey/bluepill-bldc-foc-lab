@@ -21,8 +21,27 @@ const state = {
     positionHistory: [],
     positionHistoryLimit: 120,
     traceMode: 'velocity',
-    autotuneResult: null
+    autotuneResult: null,
+    velocitySliderTimer: null,
+    positionSliderTimer: null,
+    motionProfileWritePendingUntil: 0
 };
+
+function markDirty(input) {
+    if (input) {
+        input.dataset.dirty = '1';
+    }
+}
+
+function clearDirty(input) {
+    if (input) {
+        delete input.dataset.dirty;
+    }
+}
+
+function motionProfileInputLocked(input) {
+    return !!input && (document.activeElement === input || input.dataset.dirty === '1' || Date.now() < state.motionProfileWritePendingUntil);
+}
 
 /**
  * Initialize the Web Serial API connection
@@ -42,6 +61,12 @@ async function connectSerialPort() {
         // Start reading data
         readSerialData();
         await sendCommand('GET_MODULATION');
+        await getPID();
+        await getPositionPID();
+        await getFeedforward();
+        await getLowSpeedBias();
+        await getMotionProfile();
+        await getPositionTorqueAssist();
     } catch (error) {
         console.error('Failed to connect:', error);
         updateConnectionStatus(false);
@@ -111,6 +136,9 @@ function processInputBuffer() {
                 else if (data.pid !== undefined) {
                     updatePIDDisplay(data);
                 }
+                else if (data.position_pid !== undefined) {
+                    updatePositionPIDDisplay(data);
+                }
                 // Check for target velocity confirmation
                 else if (data.target_vel !== undefined) {
                     updateTargetVelocityDisplay(data);
@@ -122,6 +150,7 @@ function processInputBuffer() {
                 else if (data.foc !== undefined) {
                     updateVelocityDisplay(data.foc);
                     updateFOCDebugDisplay(data.foc);
+                    updateMotionProfileFromTelemetry(data.foc);
                 }
                 // Check for diagnostic (loop count, message status)
                 else if (data.diag !== undefined) {
@@ -146,8 +175,29 @@ function processInputBuffer() {
                 else if (data.feedforward !== undefined) {
                     updateFeedforwardDisplay(data.feedforward);
                 }
+                else if (data.low_speed_bias !== undefined) {
+                    updateLowSpeedBiasDisplay(data.low_speed_bias);
+                }
+                else if (data.velocity_ramp !== undefined) {
+                    updateVelocityRampDisplay(data.velocity_ramp);
+                }
+                else if (data.position_velocity_limit !== undefined) {
+                    updatePositionVelocityLimitDisplay(data.position_velocity_limit);
+                }
+                else if (data.position_accel_limit !== undefined) {
+                    updatePositionAccelLimitDisplay(data.position_accel_limit);
+                }
+                else if (data.position_decel_limit !== undefined) {
+                    updatePositionDecelLimitDisplay(data.position_decel_limit);
+                }
+                else if (data.position_torque_assist !== undefined) {
+                    updatePositionTorqueAssistDisplay(data.position_torque_assist);
+                }
                 else if (data.autotune !== undefined) {
                     updateAutotuneDisplay(data.autotune);
+                }
+                else if (data.position_autotune !== undefined) {
+                    updatePositionAutotuneDisplay(data.position_autotune);
                 } else {
                     console.log('Unknown JSON:', data);
                 }
@@ -184,9 +234,11 @@ function updateVelocityDisplay(data) {
     if (data.target !== undefined) {
         const target = parseFloat(data.target).toFixed(2);
         document.getElementById('targetVelocity').textContent = target;
+        syncVelocityControls(parseFloat(data.target));
     } else if (data.t !== undefined) {
         const target = parseFloat(data.t).toFixed(2);
         document.getElementById('targetVelocity').textContent = target;
+        syncVelocityControls(parseFloat(data.t));
     }
 
     // Update last update time
@@ -220,6 +272,15 @@ function updatePIDDisplay(data) {
     }
 }
 
+function updatePositionPIDDisplay(data) {
+    if (data.position_pid) {
+        document.getElementById('posKpInput').value = parseFloat(data.position_pid.kp).toFixed(3);
+        document.getElementById('posKiInput').value = parseFloat(data.position_pid.ki).toFixed(3);
+        document.getElementById('posKdInput').value = parseFloat(data.position_pid.kd).toFixed(3);
+        console.log('Position PID updated:', data.position_pid);
+    }
+}
+
 /**
  * Update target velocity display
  * @param {Object} data - Parsed JSON object with target_vel property
@@ -228,16 +289,125 @@ function updateTargetVelocityDisplay(data) {
     if (data.target_vel !== undefined) {
         const target = parseFloat(data.target_vel).toFixed(2);
         document.getElementById('targetVelocity').textContent = target;
+        syncVelocityControls(parseFloat(data.target_vel));
         console.log('Target velocity set to:', target, 'rad/s');
     }
 }
 
+function syncVelocityControls(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+
+    const input = document.getElementById('velocityInput');
+    const slider = document.getElementById('velocitySlider');
+
+    if (input && document.activeElement !== input) {
+        input.value = value.toFixed(1);
+    }
+
+    if (slider && document.activeElement !== slider) {
+        slider.value = value.toFixed(1);
+    }
+}
+
+function syncVelocityFromSlider() {
+    const slider = document.getElementById('velocitySlider');
+    const input = document.getElementById('velocityInput');
+    if (!slider || !input) {
+        return;
+    }
+
+    const value = parseFloat(slider.value);
+    input.value = value.toFixed(1);
+
+    if (state.velocitySliderTimer) {
+        clearTimeout(state.velocitySliderTimer);
+    }
+
+    state.velocitySliderTimer = setTimeout(() => {
+        setVelocity();
+    }, 120);
+}
+
+function syncVelocityFromInput() {
+    const input = document.getElementById('velocityInput');
+    const slider = document.getElementById('velocitySlider');
+    if (!input || !slider) {
+        return;
+    }
+
+    const value = parseFloat(input.value);
+    if (!Number.isFinite(value)) {
+        return;
+    }
+
+    const clamped = Math.max(-100, Math.min(100, value));
+    slider.value = clamped.toFixed(1);
+}
+
 function updatePositionDisplay(data) {
     if (data.target_pos !== undefined) {
-        document.getElementById('positionInput').value = parseFloat(data.target_pos).toFixed(3);
+        syncPositionControls(parseFloat(data.target_pos));
     } else if (data.tp !== undefined) {
-        document.getElementById('positionInput').value = parseFloat(data.tp).toFixed(3);
+        syncPositionControls(parseFloat(data.tp));
     }
+}
+
+const POSITION_SLIDER_MIN = -10 * Math.PI;
+const POSITION_SLIDER_MAX = 10 * Math.PI;
+
+function syncPositionControls(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+
+    const input = document.getElementById('positionInput');
+    const slider = document.getElementById('positionSlider');
+
+    if (input && document.activeElement !== input) {
+        input.value = value.toFixed(3);
+    }
+
+    if (slider && document.activeElement !== slider) {
+        const clamped = Math.max(POSITION_SLIDER_MIN, Math.min(POSITION_SLIDER_MAX, value));
+        slider.value = clamped.toFixed(3);
+    }
+}
+
+function syncPositionFromSlider() {
+    const slider = document.getElementById('positionSlider');
+    const input = document.getElementById('positionInput');
+    if (!slider || !input) {
+        return;
+    }
+
+    const value = parseFloat(slider.value);
+    input.value = value.toFixed(3);
+
+    if (state.positionSliderTimer) {
+        clearTimeout(state.positionSliderTimer);
+    }
+
+    state.positionSliderTimer = setTimeout(() => {
+        setPosition();
+    }, 120);
+}
+
+function syncPositionFromInput() {
+    const input = document.getElementById('positionInput');
+    const slider = document.getElementById('positionSlider');
+    if (!input || !slider) {
+        return;
+    }
+
+    const value = parseFloat(input.value);
+    if (!Number.isFinite(value)) {
+        return;
+    }
+
+    const clamped = Math.max(POSITION_SLIDER_MIN, Math.min(POSITION_SLIDER_MAX, value));
+    slider.value = clamped.toFixed(3);
 }
 
 /**
@@ -321,6 +491,12 @@ function updateFOCDebugDisplay(focData) {
     }
     if (focData.align !== undefined) {
         document.getElementById('alignmentOffset').textContent = parseFloat(focData.align).toFixed(4) + ' rad';
+    }
+    if (focData.vramp !== undefined) {
+        updateVelocityRampDisplay(focData.vramp);
+    }
+    if (focData.pvlim !== undefined) {
+        updatePositionVelocityLimitDisplay(focData.pvlim);
     }
 }
 
@@ -446,26 +622,38 @@ async function sendCommand(command) {
  */
 async function setVelocity() {
     const input = document.getElementById('velocityInput');
-    const velocity = parseFloat(input.value);
+    const slider = document.getElementById('velocitySlider');
+    let velocity = parseFloat(input.value);
+
+    if (slider && document.activeElement === slider) {
+        velocity = parseFloat(slider.value);
+    }
 
     if (isNaN(velocity) || velocity < -100 || velocity > 100) {
         alert('Please enter a valid velocity between -100 and 100 rad/s');
         return;
     }
 
+    syncVelocityControls(velocity);
     const command = `SET_VELOCITY:${velocity.toFixed(2)}`;
     await sendCommand(command);
 }
 
 async function setPosition() {
     const input = document.getElementById('positionInput');
-    const position = parseFloat(input.value);
+    const slider = document.getElementById('positionSlider');
+    let position = parseFloat(input.value);
+
+    if (slider && document.activeElement === slider) {
+        position = parseFloat(slider.value);
+    }
 
     if (isNaN(position) || position < -1000 || position > 1000) {
         alert('Please enter a valid position between -1000 and 1000 rad');
         return;
     }
 
+    syncPositionControls(position);
     await sendCommand(`SET_POSITION:${position.toFixed(3)}`);
 }
 
@@ -542,6 +730,85 @@ function updateFeedforwardDisplay(feedforward) {
     console.log('Feedforward updated:', feedforward);
 }
 
+function updateLowSpeedBiasDisplay(lowSpeedBias) {
+    if (lowSpeedBias.voltage !== undefined) {
+        const voltageInput = document.getElementById('lowSpeedBiasVoltageInput');
+        if (voltageInput) {
+            voltageInput.value = parseFloat(lowSpeedBias.voltage).toFixed(2);
+        }
+    }
+    if (lowSpeedBias.fade_speed !== undefined) {
+        const fadeInput = document.getElementById('lowSpeedBiasFadeInput');
+        if (fadeInput) {
+            fadeInput.value = parseFloat(lowSpeedBias.fade_speed).toFixed(2);
+        }
+    }
+    console.log('Low-speed bias updated:', lowSpeedBias);
+}
+
+function updateVelocityRampDisplay(velocityRamp) {
+    const input = document.getElementById('velocityRampInput');
+    if (input && velocityRamp !== undefined) {
+        if (!motionProfileInputLocked(input)) {
+            input.value = parseFloat(velocityRamp).toFixed(2);
+        }
+    }
+}
+
+function updatePositionVelocityLimitDisplay(positionVelocityLimit) {
+    const input = document.getElementById('positionVelocityLimitInput');
+    if (input && positionVelocityLimit !== undefined) {
+        if (!motionProfileInputLocked(input)) {
+            input.value = parseFloat(positionVelocityLimit).toFixed(2);
+        }
+    }
+}
+
+function updatePositionAccelLimitDisplay(positionAccelLimit) {
+    const input = document.getElementById('positionAccelLimitInput');
+    if (input && positionAccelLimit !== undefined) {
+        if (!motionProfileInputLocked(input)) {
+            input.value = parseFloat(positionAccelLimit).toFixed(2);
+        }
+    }
+}
+
+function updatePositionDecelLimitDisplay(positionDecelLimit) {
+    const input = document.getElementById('positionDecelLimitInput');
+    if (input && positionDecelLimit !== undefined) {
+        if (!motionProfileInputLocked(input)) {
+            input.value = parseFloat(positionDecelLimit).toFixed(2);
+        }
+    }
+}
+
+function updatePositionTorqueAssistDisplay(positionTorqueAssist) {
+    const input = document.getElementById('positionTorqueAssistInput');
+    if (input && positionTorqueAssist !== undefined) {
+        if (document.activeElement !== input) {
+            input.value = parseFloat(positionTorqueAssist).toFixed(2);
+        }
+    }
+}
+
+function updateMotionProfileFromTelemetry(focData) {
+    if (focData.vramp !== undefined) {
+        updateVelocityRampDisplay(focData.vramp);
+    }
+    if (focData.pvlim !== undefined) {
+        updatePositionVelocityLimitDisplay(focData.pvlim);
+    }
+    if (focData.pacc !== undefined) {
+        updatePositionAccelLimitDisplay(focData.pacc);
+    }
+    if (focData.pdec !== undefined) {
+        updatePositionDecelLimitDisplay(focData.pdec);
+    }
+    if (focData.pboost !== undefined) {
+        updatePositionTorqueAssistDisplay(focData.pboost);
+    }
+}
+
 function updateAutotuneDisplay(autotune) {
     if (autotune.status !== undefined) {
         document.getElementById('autotuneStatus').textContent = autotune.status;
@@ -555,6 +822,20 @@ function updateAutotuneDisplay(autotune) {
     }
 
     console.log('Autotune update:', autotune);
+}
+
+function updatePositionAutotuneDisplay(autotune) {
+    if (autotune.status !== undefined) {
+        document.getElementById('positionAutotuneStatus').textContent = autotune.status;
+    }
+
+    if (autotune.kp !== undefined && autotune.ki !== undefined && autotune.kd !== undefined) {
+        document.getElementById('posKpInput').value = parseFloat(autotune.kp).toFixed(3);
+        document.getElementById('posKiInput').value = parseFloat(autotune.ki).toFixed(3);
+        document.getElementById('posKdInput').value = parseFloat(autotune.kd).toFixed(3);
+    }
+
+    console.log('Position autotune update:', autotune);
 }
 
 function pushVelocitySample(value) {
@@ -602,9 +883,18 @@ function drawTracePlot() {
     const paddingY = 16;
     const innerWidth = width - (paddingX * 2);
     const innerHeight = height - (paddingY * 2);
-    const zeroY = paddingY + (innerHeight * 0.5);
     const history = state.traceMode === 'position' ? state.positionHistory : state.velocityHistory;
-    const maxAbs = history.length > 0 ? Math.max(0.5, ...history.map(sample => Math.abs(sample))) : 0.5;
+    const isPositionTrace = state.traceMode === 'position';
+    const minValue = history.length > 0 ? Math.min(...history) : (isPositionTrace ? 0.0 : -0.5);
+    const maxValue = history.length > 0 ? Math.max(...history) : (isPositionTrace ? 1.0 : 0.5);
+    const centeredRange = history.length > 0 ? Math.max(0.5, ...history.map(sample => Math.abs(sample))) : 0.5;
+    const rangeMin = isPositionTrace ? Math.min(minValue, maxValue - 0.5) : -centeredRange;
+    const rangeMax = isPositionTrace ? Math.max(maxValue, minValue + 0.5) : centeredRange;
+    const rangeSpan = Math.max(0.5, rangeMax - rangeMin);
+    const mapValueToY = (sample) => {
+        const normalized = (sample - rangeMin) / rangeSpan;
+        return paddingY + innerHeight - (normalized * innerHeight);
+    };
 
     ctx.clearRect(0, 0, width, height);
 
@@ -619,12 +909,15 @@ function drawTracePlot() {
         ctx.stroke();
     }
 
-    ctx.strokeStyle = 'rgba(37, 99, 235, 0.75)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(paddingX, zeroY);
-    ctx.lineTo(width - paddingX, zeroY);
-    ctx.stroke();
+    if (!isPositionTrace) {
+        const zeroY = mapValueToY(0);
+        ctx.strokeStyle = 'rgba(37, 99, 235, 0.75)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(paddingX, zeroY);
+        ctx.lineTo(width - paddingX, zeroY);
+        ctx.stroke();
+    }
 
     if (history.length > 1) {
         const gradient = ctx.createLinearGradient(0, 0, width, 0);
@@ -639,7 +932,7 @@ function drawTracePlot() {
 
         history.forEach((sample, index) => {
             const x = paddingX + (innerWidth * index / (state.velocityHistoryLimit - 1));
-            const y = zeroY - ((sample / maxAbs) * (innerHeight * 0.45));
+            const y = mapValueToY(sample);
             if (index === 0) {
                 ctx.moveTo(x, y);
             } else {
@@ -650,19 +943,30 @@ function drawTracePlot() {
 
         const lastValue = history[history.length - 1];
         const lastX = paddingX + (innerWidth * (history.length - 1) / (state.velocityHistoryLimit - 1));
-        const lastY = zeroY - ((lastValue / maxAbs) * (innerHeight * 0.45));
+        const lastY = mapValueToY(lastValue);
         ctx.fillStyle = '#0f766e';
         ctx.beginPath();
         ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
         ctx.fill();
     }
 
+    ctx.fillStyle = 'rgba(82, 98, 119, 0.92)';
+    ctx.font = '12px "Segoe UI Variable", "Segoe UI", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+        const value = rangeMax - ((rangeSpan * i) / 4);
+        const y = paddingY + (innerHeight * i / 4);
+        const suffix = isPositionTrace ? ' rad' : '';
+        ctx.fillText(`${value.toFixed(isPositionTrace ? 2 : 1)}${suffix}`, paddingX + 4, y);
+    }
+
     ctx.restore();
-    if (state.traceMode === 'position') {
-        meta.textContent = `Window: ${history.length} samples | Scale: ±${maxAbs.toFixed(2)} rad`;
-        note.textContent = 'Rolling trace of measured mechanical position from FOC telemetry.';
+    if (isPositionTrace) {
+        meta.textContent = `Window: ${history.length} samples | Range: ${rangeMin.toFixed(2)} to ${rangeMax.toFixed(2)} rad`;
+        note.textContent = 'Rolling trace of measured multi-turn position from FOC telemetry.';
     } else {
-        meta.textContent = `Window: ${history.length} samples | Scale: ±${maxAbs.toFixed(2)} rad/s`;
+        meta.textContent = `Window: ${history.length} samples | Scale: ±${centeredRange.toFixed(2)} rad/s`;
         note.textContent = 'Rolling trace of measured velocity from FOC telemetry.';
     }
 }
@@ -689,6 +993,28 @@ async function setPID() {
  */
 async function getPID() {
     await sendCommand('GET_PID');
+}
+
+async function setPositionPID() {
+    const kp = parseFloat(document.getElementById('posKpInput').value);
+    const ki = parseFloat(document.getElementById('posKiInput').value);
+    const kd = parseFloat(document.getElementById('posKdInput').value);
+
+    if (isNaN(kp) || isNaN(ki) || isNaN(kd) || kp < 0 || kp > 20 || ki < 0 || ki > 10 || kd < 0 || kd > 5) {
+        alert('Please enter valid position PID values within safe ranges');
+        return;
+    }
+
+    await sendCommand(`SET_POSITION_PID:${kp.toFixed(3)},${ki.toFixed(3)},${kd.toFixed(3)}`);
+}
+
+async function getPositionPID() {
+    await sendCommand('GET_POSITION_PID');
+}
+
+async function startPositionAutotune() {
+    document.getElementById('positionAutotuneStatus').textContent = 'starting';
+    await sendCommand('START_POSITION_AUTOTUNE');
 }
 
 async function startAutotune() {
@@ -720,6 +1046,89 @@ async function setFeedforward() {
 
 async function getFeedforward() {
     await sendCommand('GET_FEEDFORWARD');
+}
+
+async function setLowSpeedBias() {
+    const voltage = parseFloat(document.getElementById('lowSpeedBiasVoltageInput').value);
+    const fadeSpeed = parseFloat(document.getElementById('lowSpeedBiasFadeInput').value);
+
+    if (isNaN(voltage) || isNaN(fadeSpeed) || voltage < 0 || voltage > 6 || fadeSpeed < 0.1 || fadeSpeed > 20) {
+        alert('Please enter low-speed bias values within the allowed ranges');
+        return;
+    }
+
+    await sendCommand(`SET_LOW_SPEED_BIAS:${voltage.toFixed(2)},${fadeSpeed.toFixed(2)}`);
+}
+
+async function getLowSpeedBias() {
+    await sendCommand('GET_LOW_SPEED_BIAS');
+}
+
+async function setMotionProfile() {
+    const velocityRampInput = document.getElementById('velocityRampInput');
+    const positionVelocityLimitInput = document.getElementById('positionVelocityLimitInput');
+    const positionAccelLimitInput = document.getElementById('positionAccelLimitInput');
+    const positionDecelLimitInput = document.getElementById('positionDecelLimitInput');
+    const velocityRamp = parseFloat(velocityRampInput.value);
+    const positionVelocityLimit = parseFloat(positionVelocityLimitInput.value);
+    const positionAccelLimit = parseFloat(positionAccelLimitInput.value);
+    const positionDecelLimit = parseFloat(positionDecelLimitInput.value);
+
+    if (isNaN(velocityRamp) || velocityRamp < 0.1 || velocityRamp > 200) {
+        alert('Please enter a velocity ramp between 0.1 and 200 rad/s²');
+        return;
+    }
+
+    if (isNaN(positionVelocityLimit) || positionVelocityLimit < 0.2 || positionVelocityLimit > 100) {
+        alert('Please enter a position velocity limit between 0.2 and 100 rad/s');
+        return;
+    }
+
+    if (isNaN(positionAccelLimit) || positionAccelLimit < 0.1 || positionAccelLimit > 400) {
+        alert('Please enter a position acceleration limit between 0.1 and 400 rad/s²');
+        return;
+    }
+    if (isNaN(positionDecelLimit) || positionDecelLimit < 0.1 || positionDecelLimit > 400) {
+        alert('Please enter a position deceleration limit between 0.1 and 400 rad/s²');
+        return;
+    }
+
+    state.motionProfileWritePendingUntil = Date.now() + 1500;
+    velocityRampInput.value = velocityRamp.toFixed(2);
+    positionVelocityLimitInput.value = positionVelocityLimit.toFixed(2);
+    positionAccelLimitInput.value = positionAccelLimit.toFixed(2);
+    positionDecelLimitInput.value = positionDecelLimit.toFixed(2);
+    clearDirty(velocityRampInput);
+    clearDirty(positionVelocityLimitInput);
+    clearDirty(positionAccelLimitInput);
+    clearDirty(positionDecelLimitInput);
+
+    await sendCommand(`SET_VELOCITY_RAMP:${velocityRamp.toFixed(2)}`);
+    await sendCommand(`SET_POSITION_VELOCITY_LIMIT:${positionVelocityLimit.toFixed(2)}`);
+    await sendCommand(`SET_POSITION_ACCEL_LIMIT:${positionAccelLimit.toFixed(2)}`);
+    await sendCommand(`SET_POSITION_DECEL_LIMIT:${positionDecelLimit.toFixed(2)}`);
+}
+
+async function getMotionProfile() {
+    await sendCommand('GET_VELOCITY_RAMP');
+    await sendCommand('GET_POSITION_VELOCITY_LIMIT');
+    await sendCommand('GET_POSITION_ACCEL_LIMIT');
+    await sendCommand('GET_POSITION_DECEL_LIMIT');
+}
+
+async function setPositionTorqueAssist() {
+    const assistVoltage = parseFloat(document.getElementById('positionTorqueAssistInput').value);
+
+    if (isNaN(assistVoltage) || assistVoltage < 0 || assistVoltage > 6) {
+        alert('Please enter a position torque assist between 0 and 6 V');
+        return;
+    }
+
+    await sendCommand(`SET_POSITION_TORQUE_ASSIST:${assistVoltage.toFixed(2)}`);
+}
+
+async function getPositionTorqueAssist() {
+    await sendCommand('GET_POSITION_TORQUE_ASSIST');
 }
 
 /**
@@ -757,6 +1166,8 @@ document.addEventListener('DOMContentLoaded', function () {
         toolbarSlot.appendChild(connectBtn);
     }
 
+    syncVelocityControls(parseFloat(document.getElementById('velocityInput')?.value || '1.0'));
+    syncPositionControls(parseFloat(document.getElementById('positionInput')?.value || '0.0'));
     drawTracePlot();
 
     console.log('Dashboard initialized. Click "Connect Serial Port" to start.');

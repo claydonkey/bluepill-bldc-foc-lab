@@ -64,6 +64,9 @@ extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 #define AUTOTUNE_COAST_DURATION_MS 250U
 #define AUTOTUNE_MAX_SAMPLES 80U
 #define AUTOTUNE_LOAD_HOLD_KI_MULTIPLIER 2.5f
+#define POSITION_AUTOTUNE_SAMPLE_PERIOD_MS 25U
+#define POSITION_AUTOTUNE_DURATION_MS 1400U
+#define POSITION_AUTOTUNE_STEP_RAD 0.35f
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -101,6 +104,26 @@ static void autotune_send_status(const char *status);
 static void autotune_finish(void);
 static void autotune_service(void);
 static void autotune_start(void);
+static void position_autotune_send_status(const char *status);
+static void position_autotune_finish(void);
+static void position_autotune_service(void);
+static void position_autotune_start(void);
+
+typedef struct
+{
+	uint8_t active;
+	uint32_t start_ms;
+	uint32_t last_sample_ms;
+	float origin;
+	float target;
+	float initial_step;
+	float max_overshoot;
+	float first_cross_error_abs;
+	float first_reach_ms;
+	uint8_t crossed_target;
+} PositionAutotuneState_t;
+
+static PositionAutotuneState_t position_autotune = {0};
 
 static void BluePill_ForceUsbReenumeration(void)
 {
@@ -206,12 +229,24 @@ void stop_motor()
 
 void set_velocity(float velocity)
 {
+	uint8_t mode_changed = (control_mode != MODE_VELOCITY);
+	float previous_target = target_velocity;
+
 	// Set the target velocity for the motor
 	control_mode = MODE_VELOCITY;
 	target_velocity = velocity;
 
-	// Reset PID when changing target to prevent windup
-	FOC_ResetPID();
+	// Only clear controller history when switching into velocity mode.
+	// Staying in velocity mode should preserve the ongoing response so
+	// repeated or nearby setpoints do not create a kick.
+	if (mode_changed)
+	{
+		FOC_ResetPIDPreserveRamp();
+	}
+	else if (fabsf(previous_target - velocity) < 0.001f)
+	{
+		// No effective target change, keep the controller completely untouched.
+	}
 
 	// Send confirmation with current target
 	char vel_msg[64];
@@ -229,14 +264,49 @@ void set_pid(float Kp, float Ki, float Kd)
 	FOC_SetPID(Kp, Ki, Kd);
 }
 
+void set_position_pid(float Kp, float Ki, float Kd)
+{
+	FOC_SetPositionPID(Kp, Ki, Kd);
+}
+
 void set_voltage_limit(float uq_limit)
 {
 	FOC_SetVoltageLimit(uq_limit);
 }
 
+void set_velocity_ramp(float accel_limit)
+{
+	FOC_SetVelocityRamp(accel_limit);
+}
+
+void set_position_velocity_limit(float velocity_limit)
+{
+	FOC_SetPositionVelocityLimit(velocity_limit);
+}
+
+void set_position_accel_limit(float accel_limit)
+{
+	FOC_SetPositionAccelLimit(accel_limit);
+}
+
+void set_position_decel_limit(float decel_limit)
+{
+	FOC_SetPositionDecelLimit(decel_limit);
+}
+
 void set_low_speed_feedforward(float voltage, float fade_speed)
 {
 	FOC_SetLowSpeedFeedforward(voltage, fade_speed);
+}
+
+void set_low_speed_bias(float voltage, float fade_speed)
+{
+	FOC_SetLowSpeedBias(voltage, fade_speed);
+}
+
+void set_position_torque_assist(float voltage)
+{
+	FOC_SetPositionTorqueAssist(voltage);
 }
 
 static void autotune_send_status(const char *status)
@@ -252,8 +322,23 @@ static void autotune_send_status(const char *status)
 
 void set_position(float position)
 {
+	const float two_pi = 2.0f * (float)M_PI;
+	float current_position = FOC_GetMechanicalPosition();
+
 	control_mode = MODE_POSITION;
-	target_position = position;
+
+	// Treat single-turn commands as "go to the nearest equivalent angle"
+	// while still allowing explicit multi-turn absolute targets.
+	if (fabsf(position) <= (two_pi + 0.001f))
+	{
+		float turn_offset = roundf((current_position - position) / two_pi);
+		target_position = position + (turn_offset * two_pi);
+	}
+	else
+	{
+		target_position = position;
+	}
+
 	FOC_ResetPID();
 
 	char pos_msg[64];
@@ -481,6 +566,7 @@ int main(void)
 			FOC_Loop(); // Call from main loop, not ISR
 		}
 		autotune_service();
+		position_autotune_service();
 		// Send one CDC packet per slot. Back-to-back Transmit calls commonly return
 		// USBD_BUSY because the previous USB IN transfer is still in flight.
 		static uint32_t last_telemetry_time = 0;
@@ -489,14 +575,16 @@ int main(void)
 		if ((current_time - last_telemetry_time) >= 250)
 		{
 			FOC_Telemetry_t foc_telemetry;
-			char telemetry[256];
+			char telemetry[448];
 			char diag[192];
 			FOC_GetTelemetry(&foc_telemetry);
 			int len = snprintf(telemetry, sizeof(telemetry),
-												 "{\"foc\":{\"v\":%.2f,\"mech\":%.3f,\"t\":%.2f,\"tp\":%.3f,\"err\":%.2f,\"uq\":%.2f,\"vlim\":%.2f,\"usat\":%u,\"mode\":%u,\"mod\":%u,\"pm\":%u,\"adir\":%.0f,\"align\":%.4f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
+												 "{\"foc\":{\"v\":%.2f,\"mech\":%.3f,\"t\":%.2f,\"tr\":%.2f,\"tp\":%.3f,\"err\":%.2f,\"uq\":%.2f,\"vlim\":%.2f,\"vramp\":%.2f,\"pvlim\":%.2f,\"pacc\":%.2f,\"pdec\":%.2f,\"pboost\":%.2f,\"usat\":%u,\"mode\":%u,\"mod\":%u,\"pm\":%u,\"adir\":%.0f,\"align\":%.4f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
 												 foc_telemetry.velocity, foc_telemetry.mechanical_angle,
-												 foc_telemetry.target_velocity, foc_telemetry.target_position, foc_telemetry.velocity_error,
+												 foc_telemetry.target_velocity, foc_telemetry.ramped_velocity_target, foc_telemetry.target_position, foc_telemetry.velocity_error,
 												 foc_telemetry.uq_voltage, foc_telemetry.voltage_limit,
+												 foc_telemetry.velocity_ramp_rate, foc_telemetry.position_velocity_limit,
+												 foc_telemetry.position_accel_limit, foc_telemetry.position_decel_limit, foc_telemetry.position_torque_assist,
 												 foc_telemetry.uq_saturated, foc_telemetry.control_mode, foc_telemetry.modulation_mode,
 												 foc_telemetry.phase_map, foc_telemetry.sensor_direction, foc_telemetry.alignment_offset,
 												 foc_telemetry.loop_count, foc_telemetry.raw_angle,
@@ -650,6 +738,18 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			autotune_start();
 		}
 	}
+	else if (strcmp(command, "START_POSITION_AUTOTUNE") == 0)
+	{
+		if (!motor_running)
+		{
+			start_motor();
+		}
+
+		if (motor_running)
+		{
+			position_autotune_start();
+		}
+	}
 	else if (strncmp(command, "TEST_VECTOR:", 12) == 0)
 	{
 		int vector_index = atoi(command + 12);
@@ -764,7 +864,7 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		char pos_msg[96];
 		int len = snprintf(pos_msg, sizeof(pos_msg),
 											 "{\"pos\":%.3f,\"target_pos\":%.3f}\r\n",
-											 AS5600_mech_angle, target_position);
+											 FOC_GetMechanicalPosition(), target_position);
 		if (len > 0 && len < (int)sizeof(pos_msg))
 		{
 			CDC_Transmit_FS((uint8_t *)pos_msg, len);
@@ -783,6 +883,18 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			CDC_Transmit_FS((uint8_t *)pid_msg, len);
 		}
 	}
+	else if (strncmp(command, "GET_POSITION_PID", 16) == 0)
+	{
+		float Kp, Ki, Kd;
+		FOC_GetPositionPID(&Kp, &Ki, &Kd);
+		char pid_msg[144];
+		int len = snprintf(pid_msg, sizeof(pid_msg),
+											 "{\"position_pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
+		if (len > 0 && len < (int)sizeof(pid_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)pid_msg, len);
+		}
+	}
 	else if (strncmp(command, "GET_VOLTAGE_LIMIT", 17) == 0)
 	{
 		char limit_msg[64];
@@ -791,6 +903,98 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		if (len > 0 && len < (int)sizeof(limit_msg))
 		{
 			CDC_Transmit_FS((uint8_t *)limit_msg, len);
+		}
+	}
+	else if (strncmp(command, "GET_VELOCITY_RAMP", 17) == 0)
+	{
+		char ramp_msg[64];
+		int len = snprintf(ramp_msg, sizeof(ramp_msg),
+											 "{\"velocity_ramp\":%.2f}\r\n", FOC_GetVelocityRamp());
+		if (len > 0 && len < (int)sizeof(ramp_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)ramp_msg, len);
+		}
+	}
+	else if (strncmp(command, "SET_VELOCITY_RAMP:", 18) == 0)
+	{
+		float accel_limit = atof(command + 18);
+		set_velocity_ramp(accel_limit);
+
+		char ramp_msg[64];
+		int len = snprintf(ramp_msg, sizeof(ramp_msg),
+											 "{\"velocity_ramp\":%.2f}\r\n", FOC_GetVelocityRamp());
+		if (len > 0 && len < (int)sizeof(ramp_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)ramp_msg, len);
+		}
+	}
+	else if (strncmp(command, "GET_POSITION_VELOCITY_LIMIT", 27) == 0)
+	{
+		char limit_msg[80];
+		int len = snprintf(limit_msg, sizeof(limit_msg),
+											 "{\"position_velocity_limit\":%.2f}\r\n", FOC_GetPositionVelocityLimit());
+		if (len > 0 && len < (int)sizeof(limit_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)limit_msg, len);
+		}
+	}
+	else if (strncmp(command, "SET_POSITION_VELOCITY_LIMIT:", 28) == 0)
+	{
+		float velocity_limit = atof(command + 28);
+		set_position_velocity_limit(velocity_limit);
+
+		char limit_msg[80];
+		int len = snprintf(limit_msg, sizeof(limit_msg),
+											 "{\"position_velocity_limit\":%.2f}\r\n", FOC_GetPositionVelocityLimit());
+		if (len > 0 && len < (int)sizeof(limit_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)limit_msg, len);
+		}
+	}
+	else if (strncmp(command, "GET_POSITION_ACCEL_LIMIT", 24) == 0)
+	{
+		char accel_msg[80];
+		int len = snprintf(accel_msg, sizeof(accel_msg),
+											 "{\"position_accel_limit\":%.2f}\r\n", FOC_GetPositionAccelLimit());
+		if (len > 0 && len < (int)sizeof(accel_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)accel_msg, len);
+		}
+	}
+	else if (strncmp(command, "GET_POSITION_DECEL_LIMIT", 24) == 0)
+	{
+		char decel_msg[80];
+		int len = snprintf(decel_msg, sizeof(decel_msg),
+											 "{\"position_decel_limit\":%.2f}\r\n", FOC_GetPositionDecelLimit());
+		if (len > 0 && len < (int)sizeof(decel_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)decel_msg, len);
+		}
+	}
+	else if (strncmp(command, "SET_POSITION_ACCEL_LIMIT:", 25) == 0)
+	{
+		float accel_limit = atof(command + 25);
+		set_position_accel_limit(accel_limit);
+
+		char accel_msg[80];
+		int len = snprintf(accel_msg, sizeof(accel_msg),
+											 "{\"position_accel_limit\":%.2f}\r\n", FOC_GetPositionAccelLimit());
+		if (len > 0 && len < (int)sizeof(accel_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)accel_msg, len);
+		}
+	}
+	else if (strncmp(command, "SET_POSITION_DECEL_LIMIT:", 25) == 0)
+	{
+		float decel_limit = atof(command + 25);
+		set_position_decel_limit(decel_limit);
+
+		char decel_msg[80];
+		int len = snprintf(decel_msg, sizeof(decel_msg),
+											 "{\"position_decel_limit\":%.2f}\r\n", FOC_GetPositionDecelLimit());
+		if (len > 0 && len < (int)sizeof(decel_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)decel_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_VOLTAGE_LIMIT:", 18) == 0)
@@ -838,6 +1042,61 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			}
 		}
 	}
+	else if (strncmp(command, "GET_LOW_SPEED_BIAS", 18) == 0)
+	{
+		float bias_voltage;
+		float bias_fade_speed;
+		FOC_GetLowSpeedBias(&bias_voltage, &bias_fade_speed);
+
+		char bias_msg[96];
+		int len = snprintf(bias_msg, sizeof(bias_msg),
+											 "{\"low_speed_bias\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n",
+											 bias_voltage, bias_fade_speed);
+		if (len > 0 && len < (int)sizeof(bias_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)bias_msg, len);
+		}
+	}
+	else if (strncmp(command, "SET_LOW_SPEED_BIAS:", 19) == 0)
+	{
+		float bias_voltage, bias_fade_speed;
+		if (sscanf(command + 19, "%f,%f", &bias_voltage, &bias_fade_speed) == 2)
+		{
+			set_low_speed_bias(bias_voltage, bias_fade_speed);
+
+			char bias_msg[96];
+			int len = snprintf(bias_msg, sizeof(bias_msg),
+												 "{\"low_speed_bias\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n",
+												 bias_voltage, bias_fade_speed);
+			if (len > 0 && len < (int)sizeof(bias_msg))
+			{
+				CDC_Transmit_FS((uint8_t *)bias_msg, len);
+			}
+		}
+	}
+	else if (strncmp(command, "GET_POSITION_TORQUE_ASSIST", 26) == 0)
+	{
+		char assist_msg[80];
+		int len = snprintf(assist_msg, sizeof(assist_msg),
+											 "{\"position_torque_assist\":%.2f}\r\n", FOC_GetPositionTorqueAssist());
+		if (len > 0 && len < (int)sizeof(assist_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)assist_msg, len);
+		}
+	}
+	else if (strncmp(command, "SET_POSITION_TORQUE_ASSIST:", 27) == 0)
+	{
+		float assist_voltage = atof(command + 27);
+		set_position_torque_assist(assist_voltage);
+
+		char assist_msg[80];
+		int len = snprintf(assist_msg, sizeof(assist_msg),
+											 "{\"position_torque_assist\":%.2f}\r\n", FOC_GetPositionTorqueAssist());
+		if (len > 0 && len < (int)sizeof(assist_msg))
+		{
+			CDC_Transmit_FS((uint8_t *)assist_msg, len);
+		}
+	}
 	else if (strncmp(command, "SET_PID:", 8) == 0)
 	{
 		float Kp, Ki, Kd;
@@ -854,6 +1113,169 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			}
 		}
 	}
+	else if (strncmp(command, "SET_POSITION_PID:", 17) == 0)
+	{
+		float Kp, Ki, Kd;
+		if (sscanf(command + 17, "%f,%f,%f", &Kp, &Ki, &Kd) == 3)
+		{
+			set_position_pid(Kp, Ki, Kd);
+
+			char pid_msg[144];
+			int len = snprintf(pid_msg, sizeof(pid_msg),
+												 "{\"position_pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
+			if (len > 0 && len < (int)sizeof(pid_msg))
+			{
+				CDC_Transmit_FS((uint8_t *)pid_msg, len);
+			}
+		}
+	}
+}
+
+static void position_autotune_send_status(const char *status)
+{
+	char msg[112];
+	int len = snprintf(msg, sizeof(msg),
+										 "{\"position_autotune\":{\"status\":\"%s\"}}\r\n", status);
+	if (len > 0 && len < (int)sizeof(msg))
+	{
+		CDC_Transmit_FS((uint8_t *)msg, len);
+	}
+}
+
+static void position_autotune_finish(void)
+{
+	float kp = 1.5f;
+	float ki = 0.0f;
+	float kd = 0.05f;
+	float reach_ms = position_autotune.first_reach_ms;
+	float overshoot = position_autotune.max_overshoot;
+
+	if ((reach_ms <= 0.0f) || (reach_ms > 1000.0f))
+	{
+		kp = 2.4f;
+		kd = 0.06f;
+	}
+	else if (reach_ms > 650.0f)
+	{
+		kp = 2.0f;
+		kd = 0.06f;
+	}
+	else if (reach_ms > 350.0f)
+	{
+		kp = 1.6f;
+		kd = 0.05f;
+	}
+	else
+	{
+		kp = 1.2f;
+		kd = 0.04f;
+	}
+
+	if (overshoot > 0.14f)
+	{
+		kp *= 0.65f;
+		kd += 0.05f;
+	}
+	else if (overshoot > 0.08f)
+	{
+		kp *= 0.8f;
+		kd += 0.03f;
+	}
+	else if (overshoot < 0.02f && reach_ms > 0.0f && reach_ms < 260.0f)
+	{
+		kp *= 1.1f;
+	}
+
+	if (kp < 0.5f)
+	{
+		kp = 0.5f;
+	}
+	else if (kp > 6.0f)
+	{
+		kp = 6.0f;
+	}
+
+	if (kd < 0.0f)
+	{
+		kd = 0.0f;
+	}
+	else if (kd > 0.25f)
+	{
+		kd = 0.25f;
+	}
+
+	FOC_SetPositionPID(kp, ki, kd);
+
+	char msg[224];
+	int len = snprintf(msg, sizeof(msg),
+										 "{\"position_autotune\":{\"status\":\"done\",\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f,\"reach_ms\":%.0f,\"overshoot\":%.4f}}\r\n",
+										 kp, ki, kd, reach_ms, overshoot);
+	if (len > 0 && len < (int)sizeof(msg))
+	{
+		CDC_Transmit_FS((uint8_t *)msg, len);
+	}
+
+	memset(&position_autotune, 0, sizeof(position_autotune));
+}
+
+static void position_autotune_service(void)
+{
+	if (!position_autotune.active)
+	{
+		return;
+	}
+
+	uint32_t now = HAL_GetTick();
+	if ((now - position_autotune.last_sample_ms) >= POSITION_AUTOTUNE_SAMPLE_PERIOD_MS)
+	{
+		float error = target_position - FOC_GetMechanicalPosition();
+
+		if (!position_autotune.crossed_target)
+		{
+			if (fabsf(error) <= (position_autotune.initial_step * 0.10f) && position_autotune.first_reach_ms <= 0.0f)
+			{
+				position_autotune.first_reach_ms = (float)(now - position_autotune.start_ms);
+			}
+
+			if (error <= 0.0f)
+			{
+				position_autotune.crossed_target = 1U;
+				position_autotune.first_cross_error_abs = fabsf(error);
+				position_autotune.max_overshoot = fabsf(error);
+			}
+		}
+		else
+		{
+			float abs_error = fabsf(error);
+			if (abs_error > position_autotune.max_overshoot)
+			{
+				position_autotune.max_overshoot = abs_error;
+			}
+		}
+
+		position_autotune.last_sample_ms = now;
+	}
+
+	if ((now - position_autotune.start_ms) >= POSITION_AUTOTUNE_DURATION_MS)
+	{
+		position_autotune_finish();
+	}
+}
+
+static void position_autotune_start(void)
+{
+	memset(&position_autotune, 0, sizeof(position_autotune));
+
+	position_autotune.active = 1U;
+	position_autotune.start_ms = HAL_GetTick();
+	position_autotune.last_sample_ms = position_autotune.start_ms;
+	position_autotune.origin = FOC_GetMechanicalPosition();
+	position_autotune.initial_step = POSITION_AUTOTUNE_STEP_RAD;
+	position_autotune.target = position_autotune.origin + POSITION_AUTOTUNE_STEP_RAD;
+
+	FOC_SetPositionPID(1.2f, 0.0f, 0.04f);
+	set_position(position_autotune.target);
+	position_autotune_send_status("running");
 }
 
 /* USER CODE END 4 */
