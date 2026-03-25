@@ -20,6 +20,7 @@
 #include "main.h"
 #include "dma.h"
 #include "i2c.h"
+#include "iwdg.h"
 #include "tim.h"
 #include "usb_device.h"
 #include "gpio.h"
@@ -80,10 +81,7 @@ static void BluePill_ForceUsbReenumeration(void);
 /* USER CODE BEGIN 0 */
 typedef enum
 {
-	AUTOTUNE_IDLE = 0,
-	AUTOTUNE_SETTLE,
-	AUTOTUNE_STEP,
-	AUTOTUNE_COAST
+	AUTOTUNE_IDLE = 0, AUTOTUNE_SETTLE, AUTOTUNE_STEP, AUTOTUNE_COAST
 } AutotunePhase_t;
 
 typedef struct
@@ -98,7 +96,8 @@ typedef struct
 	uint32_t sample_count;
 } AutotuneState_t;
 
-static AutotuneState_t autotune = {0};
+static AutotuneState_t autotune =
+{ 0 };
 
 static void autotune_send_status(const char *status);
 static void autotune_finish(void);
@@ -123,11 +122,13 @@ typedef struct
 	uint8_t crossed_target;
 } PositionAutotuneState_t;
 
-static PositionAutotuneState_t position_autotune = {0};
+static PositionAutotuneState_t position_autotune =
+{ 0 };
 
 static void BluePill_ForceUsbReenumeration(void)
 {
-	GPIO_InitTypeDef GPIO_InitStruct = {0};
+	GPIO_InitTypeDef GPIO_InitStruct =
+	{ 0 };
 
 	__HAL_RCC_GPIOA_CLK_ENABLE();
 
@@ -161,12 +162,10 @@ void start_motor()
 	if (!AS5600_WaitForHealthy(250))
 	{
 		char fault_msg[96];
-		int fault_len = snprintf(fault_msg, sizeof(fault_msg),
-													 "{\"encoder_fault\":\"offline\",\"cb\":%lu,\"err\":%lu,\"start\":%lu}\r\n",
-													 AS5600_dma_callbacks, AS5600_dma_errors, AS5600_dma_starts);
-		if (fault_len > 0 && fault_len < (int)sizeof(fault_msg))
+		int fault_len = snprintf(fault_msg, sizeof(fault_msg), "{\"encoder_fault\":\"offline\",\"cb\":%lu,\"err\":%lu,\"start\":%lu}\r\n", AS5600_dma_callbacks, AS5600_dma_errors, AS5600_dma_starts);
+		if (fault_len > 0 && fault_len < (int) sizeof(fault_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)fault_msg, fault_len);
+			CDC_Transmit_FS((uint8_t*) fault_msg, fault_len);
 		}
 		return;
 	}
@@ -179,11 +178,10 @@ void start_motor()
 	// Send status message about motor driver enable
 	extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 	char status_msg[64];
-	int len = snprintf(status_msg, sizeof(status_msg),
-										 "{\"motor_driver\":\"enabled\"}\r\n");
-	if (len > 0 && len < (int)sizeof(status_msg))
+	int len = snprintf(status_msg, sizeof(status_msg), "{\"motor_driver\":\"enabled\"}\r\n");
+	if (len > 0 && len < (int) sizeof(status_msg))
 	{
-		CDC_Transmit_FS((uint8_t *)status_msg, len);
+		CDC_Transmit_FS((uint8_t*) status_msg, len);
 	}
 
 	// Perform encoder alignment (applies alignment pulse, takes ~500ms)
@@ -197,11 +195,10 @@ void start_motor()
 	motor_running = 1;
 
 	// Send final status
-	len = snprintf(status_msg, sizeof(status_msg),
-								 "{\"motor_status\":\"running\"}\r\n");
-	if (len > 0 && len < (int)sizeof(status_msg))
+	len = snprintf(status_msg, sizeof(status_msg), "{\"motor_status\":\"running\"}\r\n");
+	if (len > 0 && len < (int) sizeof(status_msg))
 	{
-		CDC_Transmit_FS((uint8_t *)status_msg, len);
+		CDC_Transmit_FS((uint8_t*) status_msg, len);
 	}
 }
 
@@ -250,11 +247,10 @@ void set_velocity(float velocity)
 
 	// Send confirmation with current target
 	char vel_msg[64];
-	int len = snprintf(vel_msg, sizeof(vel_msg),
-										 "{\"target_vel\":%.2f}\r\n", target_velocity);
-	if (len > 0 && len < (int)sizeof(vel_msg))
+	int len = snprintf(vel_msg, sizeof(vel_msg), "{\"target_vel\":%.2f}\r\n", target_velocity);
+	if (len > 0 && len < (int) sizeof(vel_msg))
 	{
-		CDC_Transmit_FS((uint8_t *)vel_msg, len);
+		CDC_Transmit_FS((uint8_t*) vel_msg, len);
 	}
 }
 
@@ -312,17 +308,16 @@ void set_position_torque_assist(float voltage)
 static void autotune_send_status(const char *status)
 {
 	char msg[96];
-	int len = snprintf(msg, sizeof(msg),
-										 "{\"autotune\":{\"status\":\"%s\"}}\r\n", status);
-	if (len > 0 && len < (int)sizeof(msg))
+	int len = snprintf(msg, sizeof(msg), "{\"autotune\":{\"status\":\"%s\"}}\r\n", status);
+	if (len > 0 && len < (int) sizeof(msg))
 	{
-		CDC_Transmit_FS((uint8_t *)msg, len);
+		CDC_Transmit_FS((uint8_t*) msg, len);
 	}
 }
 
 void set_position(float position)
 {
-	const float two_pi = 2.0f * (float)M_PI;
+	const float two_pi = 2.0f * (float) M_PI;
 	float current_position = FOC_GetMechanicalPosition();
 
 	control_mode = MODE_POSITION;
@@ -342,11 +337,10 @@ void set_position(float position)
 	FOC_ResetPID();
 
 	char pos_msg[64];
-	int len = snprintf(pos_msg, sizeof(pos_msg),
-										 "{\"target_pos\":%.3f}\r\n", target_position);
-	if (len > 0 && len < (int)sizeof(pos_msg))
+	int len = snprintf(pos_msg, sizeof(pos_msg), "{\"target_pos\":%.3f}\r\n", target_position);
+	if (len > 0 && len < (int) sizeof(pos_msg))
 	{
-		CDC_Transmit_FS((uint8_t *)pos_msg, len);
+		CDC_Transmit_FS((uint8_t*) pos_msg, len);
 	}
 }
 
@@ -368,7 +362,7 @@ static void autotune_finish(void)
 	}
 	if (final_count > 0U)
 	{
-		final_velocity /= (float)final_count;
+		final_velocity /= (float) final_count;
 	}
 
 	if ((fabsf(final_velocity) > 0.05f) && (fabsf(autotune.step_uq) > 0.05f))
@@ -377,15 +371,14 @@ static void autotune_finish(void)
 		for (uint32_t i = 0; i < autotune.sample_count; i++)
 		{
 			float sample = autotune.sample_velocity[i];
-			if (((final_velocity >= 0.0f) && (sample >= target63)) ||
-					((final_velocity < 0.0f) && (sample <= target63)))
+			if (((final_velocity >= 0.0f) && (sample >= target63)) || ((final_velocity < 0.0f) && (sample <= target63)))
 			{
 				tau_ms = autotune.sample_time_ms[i];
 				break;
 			}
 		}
 
-		tau_s = (float)tau_ms / 1000.0f;
+		tau_s = (float) tau_ms / 1000.0f;
 		if (tau_s < 0.05f)
 		{
 			tau_s = 0.05f;
@@ -414,12 +407,11 @@ static void autotune_finish(void)
 	stop_motor();
 
 	char msg[224];
-	int len = snprintf(msg, sizeof(msg),
-										 "{\"autotune\":{\"status\":\"done\",\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f,\"step_uq\":%.2f,\"final_vel\":%.3f,\"tau_ms\":%lu}}\r\n",
-										 kp, ki, kd, autotune.step_uq, final_velocity, tau_ms);
-	if (len > 0 && len < (int)sizeof(msg))
+	int len = snprintf(msg, sizeof(msg), "{\"autotune\":{\"status\":\"done\",\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f,\"step_uq\":%.2f,\"final_vel\":%.3f,\"tau_ms\":%lu}}\r\n", kp, ki, kd,
+			autotune.step_uq, final_velocity, tau_ms);
+	if (len > 0 && len < (int) sizeof(msg))
 	{
-		CDC_Transmit_FS((uint8_t *)msg, len);
+		CDC_Transmit_FS((uint8_t*) msg, len);
 	}
 
 	memset(&autotune, 0, sizeof(autotune));
@@ -448,8 +440,7 @@ static void autotune_service(void)
 		break;
 
 	case AUTOTUNE_STEP:
-		if ((now - autotune.last_sample_ms) >= AUTOTUNE_SAMPLE_PERIOD_MS &&
-				autotune.sample_count < AUTOTUNE_MAX_SAMPLES)
+		if ((now - autotune.last_sample_ms) >= AUTOTUNE_SAMPLE_PERIOD_MS && autotune.sample_count < AUTOTUNE_MAX_SAMPLES)
 		{
 			autotune.sample_velocity[autotune.sample_count] = FOC_GetVelocity();
 			autotune.sample_time_ms[autotune.sample_count] = now - autotune.phase_start_ms;
@@ -527,6 +518,7 @@ int main(void)
 	MX_USB_DEVICE_Init();
 	MX_TIM1_Init();
 	MX_TIM2_Init();
+	MX_IWDG_Init();
 	/* USER CODE BEGIN 2 */
 
 	HAL_TIM_Base_Start(&htim1);
@@ -544,7 +536,7 @@ int main(void)
 	target_velocity = 0.0f; // Start with zero velocity - wait for START command
 
 	// Send startup confirmation
-	CDC_Transmit_FS((uint8_t *)"{\"status\":\"ready\"}\r\n", strlen("{\"status\":\"ready\"}\r\n"));
+	CDC_Transmit_FS((uint8_t*) "{\"status\":\"ready\"}\r\n", strlen("{\"status\":\"ready\"}\r\n"));
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -552,9 +544,10 @@ int main(void)
 	while (1)
 	{
 		/* USER CODE END WHILE */
+		HAL_IWDG_Refresh(&hiwdg);
 		if (usb_rx_ready)
 		{
-			process_usb_command((const char *)usb_rx_buffer, usb_rx_len);
+			process_usb_command((const char*) usb_rx_buffer, usb_rx_len);
 			usb_rx_ready = 0;															// Clear the flag
 			usb_rx_len = 0;																// Reset length
 			memset(usb_rx_buffer, 0, USB_RX_BUFFER_SIZE); // Clear buffer for next reception
@@ -578,37 +571,28 @@ int main(void)
 			char telemetry[448];
 			char diag[192];
 			FOC_GetTelemetry(&foc_telemetry);
-			int len = snprintf(telemetry, sizeof(telemetry),
-												 "{\"foc\":{\"v\":%.2f,\"mech\":%.3f,\"t\":%.2f,\"tr\":%.2f,\"tp\":%.3f,\"err\":%.2f,\"uq\":%.2f,\"vlim\":%.2f,\"vramp\":%.2f,\"pvlim\":%.2f,\"pacc\":%.2f,\"pdec\":%.2f,\"pboost\":%.2f,\"usat\":%u,\"mode\":%u,\"mod\":%u,\"pm\":%u,\"adir\":%.0f,\"align\":%.4f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
-												 foc_telemetry.velocity, foc_telemetry.mechanical_angle,
-												 foc_telemetry.target_velocity, foc_telemetry.ramped_velocity_target, foc_telemetry.target_position, foc_telemetry.velocity_error,
-												 foc_telemetry.uq_voltage, foc_telemetry.voltage_limit,
-												 foc_telemetry.velocity_ramp_rate, foc_telemetry.position_velocity_limit,
-												 foc_telemetry.position_accel_limit, foc_telemetry.position_decel_limit, foc_telemetry.position_torque_assist,
-												 foc_telemetry.uq_saturated, foc_telemetry.control_mode, foc_telemetry.modulation_mode,
-												 foc_telemetry.phase_map, foc_telemetry.sensor_direction, foc_telemetry.alignment_offset,
-												 foc_telemetry.loop_count, foc_telemetry.raw_angle,
-												 foc_telemetry.pwm1, foc_telemetry.pwm2, foc_telemetry.pwm3,
-												 foc_telemetry.pwm_period, foc_telemetry.dma_callbacks,
-												 foc_telemetry.dma_errors, foc_telemetry.dma_starts,
-												 foc_telemetry.motor_running);
-			int diag_len = snprintf(diag, sizeof(diag),
-															"{\"diag\":{\"lc\":%lu,\"sent\":%lu,\"failed\":%lu,\"enc\":%u,\"cb\":%lu,\"err\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
-															foc_telemetry.loop_count, foc_telemetry.messages_sent,
-															foc_telemetry.messages_failed, foc_telemetry.raw_angle,
-															foc_telemetry.dma_callbacks, foc_telemetry.dma_errors,
-															foc_telemetry.dma_starts, foc_telemetry.motor_running);
-			if (len > 0 && len < (int)sizeof(telemetry) &&
-					diag_len > 0 && diag_len < (int)sizeof(diag))
+			int len =
+					snprintf(telemetry, sizeof(telemetry),
+							"{\"foc\":{\"v\":%.2f,\"mech\":%.3f,\"t\":%.2f,\"tr\":%.2f,\"tp\":%.3f,\"err\":%.2f,\"uq\":%.2f,\"vlim\":%.2f,\"vramp\":%.2f,\"pvlim\":%.2f,\"pacc\":%.2f,\"pdec\":%.2f,\"pboost\":%.2f,\"usat\":%u,\"mode\":%u,\"mod\":%u,\"pm\":%u,\"adir\":%.0f,\"align\":%.4f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
+							foc_telemetry.velocity, foc_telemetry.mechanical_angle, foc_telemetry.target_velocity, foc_telemetry.ramped_velocity_target, foc_telemetry.target_position,
+							foc_telemetry.velocity_error, foc_telemetry.uq_voltage, foc_telemetry.voltage_limit, foc_telemetry.velocity_ramp_rate, foc_telemetry.position_velocity_limit,
+							foc_telemetry.position_accel_limit, foc_telemetry.position_decel_limit, foc_telemetry.position_torque_assist, foc_telemetry.uq_saturated, foc_telemetry.control_mode,
+							foc_telemetry.modulation_mode, foc_telemetry.phase_map, foc_telemetry.sensor_direction, foc_telemetry.alignment_offset, foc_telemetry.loop_count, foc_telemetry.raw_angle,
+							foc_telemetry.pwm1, foc_telemetry.pwm2, foc_telemetry.pwm3, foc_telemetry.pwm_period, foc_telemetry.dma_callbacks, foc_telemetry.dma_errors, foc_telemetry.dma_starts,
+							foc_telemetry.motor_running);
+			int diag_len = snprintf(diag, sizeof(diag), "{\"diag\":{\"lc\":%lu,\"sent\":%lu,\"failed\":%lu,\"enc\":%u,\"cb\":%lu,\"err\":%lu,\"start\":%lu,\"run\":%u}}\r\n", foc_telemetry.loop_count,
+					foc_telemetry.messages_sent, foc_telemetry.messages_failed, foc_telemetry.raw_angle, foc_telemetry.dma_callbacks, foc_telemetry.dma_errors, foc_telemetry.dma_starts,
+					foc_telemetry.motor_running);
+			if (len > 0 && len < (int) sizeof(telemetry) && diag_len > 0 && diag_len < (int) sizeof(diag))
 			{
 				uint8_t result;
 				if (send_diag_next)
 				{
-					result = CDC_Transmit_FS((uint8_t *)diag, diag_len);
+					result = CDC_Transmit_FS((uint8_t*) diag, diag_len);
 				}
 				else
 				{
-					result = CDC_Transmit_FS((uint8_t *)telemetry, len);
+					result = CDC_Transmit_FS((uint8_t*) telemetry, len);
 				}
 				if (result == USBD_OK)
 				{
@@ -636,19 +620,20 @@ int main(void)
 void SystemClock_Config(void)
 {
 	RCC_OscInitTypeDef RCC_OscInitStruct =
-			{0};
+	{ 0 };
 	RCC_ClkInitTypeDef RCC_ClkInitStruct =
-			{0};
+	{ 0 };
 	RCC_PeriphCLKInitTypeDef PeriphClkInit =
-			{0};
+	{ 0 };
 
 	/** Initializes the RCC Oscillators according to the specified parameters
 	 * in the RCC_OscInitTypeDef structure.
 	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI | RCC_OSCILLATORTYPE_HSE;
 	RCC_OscInitStruct.HSEState = RCC_HSE_ON;
 	RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
 	RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+	RCC_OscInitStruct.LSIState = RCC_LSI_ON;
 	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
 	RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
 	RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
@@ -719,11 +704,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		motor_running = 1;
 
 		char mode_msg[96];
-		int len = snprintf(mode_msg, sizeof(mode_msg),
-											 "{\"open_loop\":{\"elec_vel\":%.2f,\"uq\":%.2f}}\r\n", 20.0f, 1.0f);
-		if (len > 0 && len < (int)sizeof(mode_msg))
+		int len = snprintf(mode_msg, sizeof(mode_msg), "{\"open_loop\":{\"elec_vel\":%.2f,\"uq\":%.2f}}\r\n", 20.0f, 1.0f);
+		if (len > 0 && len < (int) sizeof(mode_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)mode_msg, len);
+			CDC_Transmit_FS((uint8_t*) mode_msg, len);
 		}
 	}
 	else if (strcmp(command, "START_AUTOTUNE") == 0)
@@ -756,16 +740,15 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		if (vector_index >= 0 && vector_index <= 5)
 		{
 			extern volatile uint8_t motor_running;
-			FOC_StartVectorTest((uint8_t)vector_index, 1.0f);
+			FOC_StartVectorTest((uint8_t) vector_index, 1.0f);
 			HAL_GPIO_WritePin(MOT1_EN_GPIO_Port, MOT1_EN_Pin, GPIO_PIN_SET);
 			motor_running = 1;
 
 			char vector_msg[96];
-			int len = snprintf(vector_msg, sizeof(vector_msg),
-												 "{\"vector_test\":{\"index\":%d,\"uq\":%.2f}}\r\n", vector_index, 1.0f);
-			if (len > 0 && len < (int)sizeof(vector_msg))
+			int len = snprintf(vector_msg, sizeof(vector_msg), "{\"vector_test\":{\"index\":%d,\"uq\":%.2f}}\r\n", vector_index, 1.0f);
+			if (len > 0 && len < (int) sizeof(vector_msg))
 			{
-				CDC_Transmit_FS((uint8_t *)vector_msg, len);
+				CDC_Transmit_FS((uint8_t*) vector_msg, len);
 			}
 		}
 	}
@@ -779,13 +762,12 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		int map = atoi(command + 14);
 		if (map >= 0 && map <= 5)
 		{
-			FOC_SetPhaseMap((uint8_t)map);
+			FOC_SetPhaseMap((uint8_t) map);
 			char phase_msg[64];
-			int phase_len = snprintf(phase_msg, sizeof(phase_msg),
-															 "{\"phase_map\":%d}\r\n", map);
-			if (phase_len > 0 && phase_len < (int)sizeof(phase_msg))
+			int phase_len = snprintf(phase_msg, sizeof(phase_msg), "{\"phase_map\":%d}\r\n", map);
+			if (phase_len > 0 && phase_len < (int) sizeof(phase_msg))
 			{
-				CDC_Transmit_FS((uint8_t *)phase_msg, phase_len);
+				CDC_Transmit_FS((uint8_t*) phase_msg, phase_len);
 			}
 		}
 	}
@@ -808,23 +790,19 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 
 		FOC_SetModulationMode(new_mode);
 		char mod_msg[64];
-		int mod_len = snprintf(mod_msg, sizeof(mod_msg),
-												 "{\"modulation\":\"%s\"}\r\n",
-												 (FOC_GetModulationMode() == MODULATION_SINE) ? "SINE" : "SVPWM");
-		if (mod_len > 0 && mod_len < (int)sizeof(mod_msg))
+		int mod_len = snprintf(mod_msg, sizeof(mod_msg), "{\"modulation\":\"%s\"}\r\n", (FOC_GetModulationMode() == MODULATION_SINE) ? "SINE" : "SVPWM");
+		if (mod_len > 0 && mod_len < (int) sizeof(mod_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)mod_msg, mod_len);
+			CDC_Transmit_FS((uint8_t*) mod_msg, mod_len);
 		}
 	}
 	else if (strcmp(command, "GET_MODULATION") == 0)
 	{
 		char mod_msg[64];
-		int mod_len = snprintf(mod_msg, sizeof(mod_msg),
-												 "{\"modulation\":\"%s\"}\r\n",
-												 (FOC_GetModulationMode() == MODULATION_SINE) ? "SINE" : "SVPWM");
-		if (mod_len > 0 && mod_len < (int)sizeof(mod_msg))
+		int mod_len = snprintf(mod_msg, sizeof(mod_msg), "{\"modulation\":\"%s\"}\r\n", (FOC_GetModulationMode() == MODULATION_SINE) ? "SINE" : "SVPWM");
+		if (mod_len > 0 && mod_len < (int) sizeof(mod_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)mod_msg, mod_len);
+			CDC_Transmit_FS((uint8_t*) mod_msg, mod_len);
 		}
 	}
 	else if (strncmp(command, "SET_VELOCITY:", 13) == 0)
@@ -835,11 +813,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 
 		// Send immediate confirmation with updated target
 		char confirm_msg[64];
-		int len = snprintf(confirm_msg, sizeof(confirm_msg),
-											 "{\"vel\":%.3f,\"target\":%.3f}\r\n", FOC_GetVelocity(), velocity);
-		if (len > 0 && len < (int)sizeof(confirm_msg))
+		int len = snprintf(confirm_msg, sizeof(confirm_msg), "{\"vel\":%.3f,\"target\":%.3f}\r\n", FOC_GetVelocity(), velocity);
+		if (len > 0 && len < (int) sizeof(confirm_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)confirm_msg, len);
+			CDC_Transmit_FS((uint8_t*) confirm_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_POSITION:", 13) == 0)
@@ -852,22 +829,19 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		// Report current velocity and target immediately
 		float current_velocity = FOC_GetVelocity();
 		char vel_msg[64];
-		int len = snprintf(vel_msg, sizeof(vel_msg),
-											 "{\"vel\":%.3f,\"target\":%.3f}\r\n", current_velocity, target_velocity);
-		if (len > 0 && len < (int)sizeof(vel_msg))
+		int len = snprintf(vel_msg, sizeof(vel_msg), "{\"vel\":%.3f,\"target\":%.3f}\r\n", current_velocity, target_velocity);
+		if (len > 0 && len < (int) sizeof(vel_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)vel_msg, len);
+			CDC_Transmit_FS((uint8_t*) vel_msg, len);
 		}
 	}
 	else if (strcmp(command, "GET_POSITION") == 0)
 	{
 		char pos_msg[96];
-		int len = snprintf(pos_msg, sizeof(pos_msg),
-											 "{\"pos\":%.3f,\"target_pos\":%.3f}\r\n",
-											 FOC_GetMechanicalPosition(), target_position);
-		if (len > 0 && len < (int)sizeof(pos_msg))
+		int len = snprintf(pos_msg, sizeof(pos_msg), "{\"pos\":%.3f,\"target_pos\":%.3f}\r\n", FOC_GetMechanicalPosition(), target_position);
+		if (len > 0 && len < (int) sizeof(pos_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)pos_msg, len);
+			CDC_Transmit_FS((uint8_t*) pos_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_PID", 7) == 0)
@@ -876,11 +850,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		float Kp, Ki, Kd;
 		FOC_GetPID(&Kp, &Ki, &Kd);
 		char pid_msg[128];
-		int len = snprintf(pid_msg, sizeof(pid_msg),
-											 "{\"pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
-		if (len > 0 && len < (int)sizeof(pid_msg))
+		int len = snprintf(pid_msg, sizeof(pid_msg), "{\"pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
+		if (len > 0 && len < (int) sizeof(pid_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)pid_msg, len);
+			CDC_Transmit_FS((uint8_t*) pid_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_POSITION_PID", 16) == 0)
@@ -888,31 +861,28 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		float Kp, Ki, Kd;
 		FOC_GetPositionPID(&Kp, &Ki, &Kd);
 		char pid_msg[144];
-		int len = snprintf(pid_msg, sizeof(pid_msg),
-											 "{\"position_pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
-		if (len > 0 && len < (int)sizeof(pid_msg))
+		int len = snprintf(pid_msg, sizeof(pid_msg), "{\"position_pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
+		if (len > 0 && len < (int) sizeof(pid_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)pid_msg, len);
+			CDC_Transmit_FS((uint8_t*) pid_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_VOLTAGE_LIMIT", 17) == 0)
 	{
 		char limit_msg[64];
-		int len = snprintf(limit_msg, sizeof(limit_msg),
-											 "{\"voltage_limit\":%.2f}\r\n", FOC_GetVoltageLimit());
-		if (len > 0 && len < (int)sizeof(limit_msg))
+		int len = snprintf(limit_msg, sizeof(limit_msg), "{\"voltage_limit\":%.2f}\r\n", FOC_GetVoltageLimit());
+		if (len > 0 && len < (int) sizeof(limit_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)limit_msg, len);
+			CDC_Transmit_FS((uint8_t*) limit_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_VELOCITY_RAMP", 17) == 0)
 	{
 		char ramp_msg[64];
-		int len = snprintf(ramp_msg, sizeof(ramp_msg),
-											 "{\"velocity_ramp\":%.2f}\r\n", FOC_GetVelocityRamp());
-		if (len > 0 && len < (int)sizeof(ramp_msg))
+		int len = snprintf(ramp_msg, sizeof(ramp_msg), "{\"velocity_ramp\":%.2f}\r\n", FOC_GetVelocityRamp());
+		if (len > 0 && len < (int) sizeof(ramp_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)ramp_msg, len);
+			CDC_Transmit_FS((uint8_t*) ramp_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_VELOCITY_RAMP:", 18) == 0)
@@ -921,21 +891,19 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		set_velocity_ramp(accel_limit);
 
 		char ramp_msg[64];
-		int len = snprintf(ramp_msg, sizeof(ramp_msg),
-											 "{\"velocity_ramp\":%.2f}\r\n", FOC_GetVelocityRamp());
-		if (len > 0 && len < (int)sizeof(ramp_msg))
+		int len = snprintf(ramp_msg, sizeof(ramp_msg), "{\"velocity_ramp\":%.2f}\r\n", FOC_GetVelocityRamp());
+		if (len > 0 && len < (int) sizeof(ramp_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)ramp_msg, len);
+			CDC_Transmit_FS((uint8_t*) ramp_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_POSITION_VELOCITY_LIMIT", 27) == 0)
 	{
 		char limit_msg[80];
-		int len = snprintf(limit_msg, sizeof(limit_msg),
-											 "{\"position_velocity_limit\":%.2f}\r\n", FOC_GetPositionVelocityLimit());
-		if (len > 0 && len < (int)sizeof(limit_msg))
+		int len = snprintf(limit_msg, sizeof(limit_msg), "{\"position_velocity_limit\":%.2f}\r\n", FOC_GetPositionVelocityLimit());
+		if (len > 0 && len < (int) sizeof(limit_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)limit_msg, len);
+			CDC_Transmit_FS((uint8_t*) limit_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_POSITION_VELOCITY_LIMIT:", 28) == 0)
@@ -944,31 +912,28 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		set_position_velocity_limit(velocity_limit);
 
 		char limit_msg[80];
-		int len = snprintf(limit_msg, sizeof(limit_msg),
-											 "{\"position_velocity_limit\":%.2f}\r\n", FOC_GetPositionVelocityLimit());
-		if (len > 0 && len < (int)sizeof(limit_msg))
+		int len = snprintf(limit_msg, sizeof(limit_msg), "{\"position_velocity_limit\":%.2f}\r\n", FOC_GetPositionVelocityLimit());
+		if (len > 0 && len < (int) sizeof(limit_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)limit_msg, len);
+			CDC_Transmit_FS((uint8_t*) limit_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_POSITION_ACCEL_LIMIT", 24) == 0)
 	{
 		char accel_msg[80];
-		int len = snprintf(accel_msg, sizeof(accel_msg),
-											 "{\"position_accel_limit\":%.2f}\r\n", FOC_GetPositionAccelLimit());
-		if (len > 0 && len < (int)sizeof(accel_msg))
+		int len = snprintf(accel_msg, sizeof(accel_msg), "{\"position_accel_limit\":%.2f}\r\n", FOC_GetPositionAccelLimit());
+		if (len > 0 && len < (int) sizeof(accel_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)accel_msg, len);
+			CDC_Transmit_FS((uint8_t*) accel_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_POSITION_DECEL_LIMIT", 24) == 0)
 	{
 		char decel_msg[80];
-		int len = snprintf(decel_msg, sizeof(decel_msg),
-											 "{\"position_decel_limit\":%.2f}\r\n", FOC_GetPositionDecelLimit());
-		if (len > 0 && len < (int)sizeof(decel_msg))
+		int len = snprintf(decel_msg, sizeof(decel_msg), "{\"position_decel_limit\":%.2f}\r\n", FOC_GetPositionDecelLimit());
+		if (len > 0 && len < (int) sizeof(decel_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)decel_msg, len);
+			CDC_Transmit_FS((uint8_t*) decel_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_POSITION_ACCEL_LIMIT:", 25) == 0)
@@ -977,11 +942,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		set_position_accel_limit(accel_limit);
 
 		char accel_msg[80];
-		int len = snprintf(accel_msg, sizeof(accel_msg),
-											 "{\"position_accel_limit\":%.2f}\r\n", FOC_GetPositionAccelLimit());
-		if (len > 0 && len < (int)sizeof(accel_msg))
+		int len = snprintf(accel_msg, sizeof(accel_msg), "{\"position_accel_limit\":%.2f}\r\n", FOC_GetPositionAccelLimit());
+		if (len > 0 && len < (int) sizeof(accel_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)accel_msg, len);
+			CDC_Transmit_FS((uint8_t*) accel_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_POSITION_DECEL_LIMIT:", 25) == 0)
@@ -990,11 +954,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		set_position_decel_limit(decel_limit);
 
 		char decel_msg[80];
-		int len = snprintf(decel_msg, sizeof(decel_msg),
-											 "{\"position_decel_limit\":%.2f}\r\n", FOC_GetPositionDecelLimit());
-		if (len > 0 && len < (int)sizeof(decel_msg))
+		int len = snprintf(decel_msg, sizeof(decel_msg), "{\"position_decel_limit\":%.2f}\r\n", FOC_GetPositionDecelLimit());
+		if (len > 0 && len < (int) sizeof(decel_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)decel_msg, len);
+			CDC_Transmit_FS((uint8_t*) decel_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_VOLTAGE_LIMIT:", 18) == 0)
@@ -1003,11 +966,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		set_voltage_limit(uq_limit);
 
 		char limit_msg[64];
-		int len = snprintf(limit_msg, sizeof(limit_msg),
-											 "{\"voltage_limit\":%.2f}\r\n", FOC_GetVoltageLimit());
-		if (len > 0 && len < (int)sizeof(limit_msg))
+		int len = snprintf(limit_msg, sizeof(limit_msg), "{\"voltage_limit\":%.2f}\r\n", FOC_GetVoltageLimit());
+		if (len > 0 && len < (int) sizeof(limit_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)limit_msg, len);
+			CDC_Transmit_FS((uint8_t*) limit_msg, len);
 		}
 	}
 	else if (strncmp(command, "GET_FEEDFORWARD", 15) == 0)
@@ -1017,12 +979,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		FOC_GetLowSpeedFeedforward(&ff_voltage, &ff_fade_speed);
 
 		char ff_msg[96];
-		int len = snprintf(ff_msg, sizeof(ff_msg),
-											 "{\"feedforward\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n",
-											 ff_voltage, ff_fade_speed);
-		if (len > 0 && len < (int)sizeof(ff_msg))
+		int len = snprintf(ff_msg, sizeof(ff_msg), "{\"feedforward\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n", ff_voltage, ff_fade_speed);
+		if (len > 0 && len < (int) sizeof(ff_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)ff_msg, len);
+			CDC_Transmit_FS((uint8_t*) ff_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_FEEDFORWARD:", 16) == 0)
@@ -1033,12 +993,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			set_low_speed_feedforward(ff_voltage, ff_fade_speed);
 
 			char ff_msg[96];
-			int len = snprintf(ff_msg, sizeof(ff_msg),
-												 "{\"feedforward\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n",
-												 ff_voltage, ff_fade_speed);
-			if (len > 0 && len < (int)sizeof(ff_msg))
+			int len = snprintf(ff_msg, sizeof(ff_msg), "{\"feedforward\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n", ff_voltage, ff_fade_speed);
+			if (len > 0 && len < (int) sizeof(ff_msg))
 			{
-				CDC_Transmit_FS((uint8_t *)ff_msg, len);
+				CDC_Transmit_FS((uint8_t*) ff_msg, len);
 			}
 		}
 	}
@@ -1049,12 +1007,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		FOC_GetLowSpeedBias(&bias_voltage, &bias_fade_speed);
 
 		char bias_msg[96];
-		int len = snprintf(bias_msg, sizeof(bias_msg),
-											 "{\"low_speed_bias\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n",
-											 bias_voltage, bias_fade_speed);
-		if (len > 0 && len < (int)sizeof(bias_msg))
+		int len = snprintf(bias_msg, sizeof(bias_msg), "{\"low_speed_bias\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n", bias_voltage, bias_fade_speed);
+		if (len > 0 && len < (int) sizeof(bias_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)bias_msg, len);
+			CDC_Transmit_FS((uint8_t*) bias_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_LOW_SPEED_BIAS:", 19) == 0)
@@ -1065,23 +1021,20 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			set_low_speed_bias(bias_voltage, bias_fade_speed);
 
 			char bias_msg[96];
-			int len = snprintf(bias_msg, sizeof(bias_msg),
-												 "{\"low_speed_bias\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n",
-												 bias_voltage, bias_fade_speed);
-			if (len > 0 && len < (int)sizeof(bias_msg))
+			int len = snprintf(bias_msg, sizeof(bias_msg), "{\"low_speed_bias\":{\"voltage\":%.2f,\"fade_speed\":%.2f}}\r\n", bias_voltage, bias_fade_speed);
+			if (len > 0 && len < (int) sizeof(bias_msg))
 			{
-				CDC_Transmit_FS((uint8_t *)bias_msg, len);
+				CDC_Transmit_FS((uint8_t*) bias_msg, len);
 			}
 		}
 	}
 	else if (strncmp(command, "GET_POSITION_TORQUE_ASSIST", 26) == 0)
 	{
 		char assist_msg[80];
-		int len = snprintf(assist_msg, sizeof(assist_msg),
-											 "{\"position_torque_assist\":%.2f}\r\n", FOC_GetPositionTorqueAssist());
-		if (len > 0 && len < (int)sizeof(assist_msg))
+		int len = snprintf(assist_msg, sizeof(assist_msg), "{\"position_torque_assist\":%.2f}\r\n", FOC_GetPositionTorqueAssist());
+		if (len > 0 && len < (int) sizeof(assist_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)assist_msg, len);
+			CDC_Transmit_FS((uint8_t*) assist_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_POSITION_TORQUE_ASSIST:", 27) == 0)
@@ -1090,11 +1043,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		set_position_torque_assist(assist_voltage);
 
 		char assist_msg[80];
-		int len = snprintf(assist_msg, sizeof(assist_msg),
-											 "{\"position_torque_assist\":%.2f}\r\n", FOC_GetPositionTorqueAssist());
-		if (len > 0 && len < (int)sizeof(assist_msg))
+		int len = snprintf(assist_msg, sizeof(assist_msg), "{\"position_torque_assist\":%.2f}\r\n", FOC_GetPositionTorqueAssist());
+		if (len > 0 && len < (int) sizeof(assist_msg))
 		{
-			CDC_Transmit_FS((uint8_t *)assist_msg, len);
+			CDC_Transmit_FS((uint8_t*) assist_msg, len);
 		}
 	}
 	else if (strncmp(command, "SET_PID:", 8) == 0)
@@ -1105,11 +1057,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			set_pid(Kp, Ki, Kd);
 
 			char pid_msg[128];
-			int len = snprintf(pid_msg, sizeof(pid_msg),
-												 "{\"pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
-			if (len > 0 && len < (int)sizeof(pid_msg))
+			int len = snprintf(pid_msg, sizeof(pid_msg), "{\"pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
+			if (len > 0 && len < (int) sizeof(pid_msg))
 			{
-				CDC_Transmit_FS((uint8_t *)pid_msg, len);
+				CDC_Transmit_FS((uint8_t*) pid_msg, len);
 			}
 		}
 	}
@@ -1121,11 +1072,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 			set_position_pid(Kp, Ki, Kd);
 
 			char pid_msg[144];
-			int len = snprintf(pid_msg, sizeof(pid_msg),
-												 "{\"position_pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
-			if (len > 0 && len < (int)sizeof(pid_msg))
+			int len = snprintf(pid_msg, sizeof(pid_msg), "{\"position_pid\":{\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f}}\r\n", Kp, Ki, Kd);
+			if (len > 0 && len < (int) sizeof(pid_msg))
 			{
-				CDC_Transmit_FS((uint8_t *)pid_msg, len);
+				CDC_Transmit_FS((uint8_t*) pid_msg, len);
 			}
 		}
 	}
@@ -1134,11 +1084,10 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 static void position_autotune_send_status(const char *status)
 {
 	char msg[112];
-	int len = snprintf(msg, sizeof(msg),
-										 "{\"position_autotune\":{\"status\":\"%s\"}}\r\n", status);
-	if (len > 0 && len < (int)sizeof(msg))
+	int len = snprintf(msg, sizeof(msg), "{\"position_autotune\":{\"status\":\"%s\"}}\r\n", status);
+	if (len > 0 && len < (int) sizeof(msg))
 	{
-		CDC_Transmit_FS((uint8_t *)msg, len);
+		CDC_Transmit_FS((uint8_t*) msg, len);
 	}
 }
 
@@ -1207,12 +1156,10 @@ static void position_autotune_finish(void)
 	FOC_SetPositionPID(kp, ki, kd);
 
 	char msg[224];
-	int len = snprintf(msg, sizeof(msg),
-										 "{\"position_autotune\":{\"status\":\"done\",\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f,\"reach_ms\":%.0f,\"overshoot\":%.4f}}\r\n",
-										 kp, ki, kd, reach_ms, overshoot);
-	if (len > 0 && len < (int)sizeof(msg))
+	int len = snprintf(msg, sizeof(msg), "{\"position_autotune\":{\"status\":\"done\",\"kp\":%.3f,\"ki\":%.3f,\"kd\":%.3f,\"reach_ms\":%.0f,\"overshoot\":%.4f}}\r\n", kp, ki, kd, reach_ms, overshoot);
+	if (len > 0 && len < (int) sizeof(msg))
 	{
-		CDC_Transmit_FS((uint8_t *)msg, len);
+		CDC_Transmit_FS((uint8_t*) msg, len);
 	}
 
 	memset(&position_autotune, 0, sizeof(position_autotune));
@@ -1234,7 +1181,7 @@ static void position_autotune_service(void)
 		{
 			if (fabsf(error) <= (position_autotune.initial_step * 0.10f) && position_autotune.first_reach_ms <= 0.0f)
 			{
-				position_autotune.first_reach_ms = (float)(now - position_autotune.start_ms);
+				position_autotune.first_reach_ms = (float) (now - position_autotune.start_ms);
 			}
 
 			if (error <= 0.0f)
@@ -1296,17 +1243,17 @@ void Error_Handler(void)
 }
 #ifdef USE_FULL_ASSERT
 /**
- * @brief  Reports the name of the source file and the source line number
- *         where the assert_param error has occurred.
- * @param  file: pointer to the source file name
- * @param  line: assert_param error line source number
- * @retval None
- */
+  * @brief  Reports the name of the source file and the source line number
+  *         where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
 void assert_failed(uint8_t *file, uint32_t line)
 {
-	/* USER CODE BEGIN 6 */
+  /* USER CODE BEGIN 6 */
 	/* User can add his own implementation to report the file name and line number,
 		 ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-	/* USER CODE END 6 */
+  /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
