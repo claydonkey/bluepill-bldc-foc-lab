@@ -51,12 +51,15 @@ const state = {
     previousMultiTurnHistoryLimit: 120,
     traceMode: 'velocity',
     autotuneResult: null,
+    theme: 'light',
     velocitySliderTimer: null,
     positionSliderTimer: null,
     motionProfileWritePendingUntil: 0,
     debugConsoleLines: [],
     seenFirmwareTag: null
 };
+
+const THEME_STORAGE_KEY = 'bluepill_foc_theme';
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -106,6 +109,37 @@ function clearDebugConsole() {
     if (frame) {
         frame.innerHTML = '';
     }
+}
+
+function applyTheme(theme) {
+    const nextTheme = theme === 'dark' ? 'dark' : 'light';
+    state.theme = nextTheme;
+    document.documentElement.setAttribute('data-theme', nextTheme);
+    try {
+        localStorage.setItem(THEME_STORAGE_KEY, nextTheme);
+    } catch (error) {
+        console.warn('Failed to persist theme:', error);
+    }
+    const themeBtn = document.getElementById('themeToggleBtn');
+    if (themeBtn) {
+        themeBtn.textContent = nextTheme === 'dark' ? 'Light Theme' : 'Dark Theme';
+    }
+}
+
+function loadStoredTheme() {
+    try {
+        const stored = localStorage.getItem(THEME_STORAGE_KEY);
+        if (stored === 'dark' || stored === 'light') {
+            return stored;
+        }
+    } catch (error) {
+        console.warn('Failed to load stored theme:', error);
+    }
+    return 'light';
+}
+
+function toggleTheme() {
+    applyTheme(state.theme === 'dark' ? 'light' : 'dark');
 }
 
 /**
@@ -228,13 +262,17 @@ function refreshTelemetryPollingUI() {
         return;
     }
 
+    toggleBtn.classList.remove('polling-live', 'polling-paused');
+
     if (state.telemetryPollEnabled) {
-        toggleBtn.textContent = 'Pause Polling';
+        toggleBtn.textContent = '⏸';
+        toggleBtn.classList.add('polling-live');
         stateLabel.textContent = state.isConnected
             ? `Live at ${state.telemetryPollIntervalMs} ms`
             : `Ready at ${state.telemetryPollIntervalMs} ms`;
     } else {
-        toggleBtn.textContent = 'Resume Polling';
+        toggleBtn.textContent = '▶';
+        toggleBtn.classList.add('polling-paused');
         stateLabel.textContent = state.isConnected ? 'Paused' : 'Disabled';
     }
 }
@@ -596,15 +634,17 @@ function syncVelocityFromInput() {
 }
 
 function updatePositionDisplay(data) {
-    if (data.target_pos !== undefined) {
+    if (data.pos !== undefined) {
+        syncPositionControls(parseFloat(data.pos));
+    } else if (data.target_pos !== undefined) {
         syncPositionControls(parseFloat(data.target_pos));
     } else if (data.tp !== undefined) {
         syncPositionControls(parseFloat(data.tp));
     }
 }
 
-const POSITION_SLIDER_MIN = -10 * Math.PI;
-const POSITION_SLIDER_MAX = 10 * Math.PI;
+const POSITION_SLIDER_MIN = -100 * Math.PI;
+const POSITION_SLIDER_MAX = 100 * Math.PI;
 
 function syncPositionControls(value) {
     if (!Number.isFinite(value)) {
@@ -711,6 +751,10 @@ function updateFOCDebugDisplay(focData) {
     }
     if (focData.tp !== undefined) {
         pushTargetPositionSample(parseFloat(focData.tp));
+    }
+    if (focData.mode !== undefined && parseInt(focData.mode, 10) === 0 && focData.mech !== undefined) {
+        syncPositionControls(parseFloat(focData.mech));
+    } else if (focData.tp !== undefined) {
         syncPositionControls(parseFloat(focData.tp));
     }
     if (focData.r !== undefined) {
@@ -868,6 +912,7 @@ function updateConnectionStatus(connected) {
     const statusElement = document.getElementById('connectionStatus');
     const statusText = document.getElementById('connectionText');
     const heroConnection = document.getElementById('heroConnection');
+    const dfuButton = document.getElementById('dfuModeBtn');
 
     if (connected) {
         statusElement.classList.add('connected');
@@ -883,6 +928,10 @@ function updateConnectionStatus(connected) {
         if (heroConnection) {
             heroConnection.textContent = 'Disconnected';
         }
+    }
+
+    if (dfuButton) {
+        dfuButton.style.display = connected ? 'inline-flex' : 'none';
     }
 
     refreshTelemetryPollingUI();
@@ -960,13 +1009,17 @@ async function setPosition() {
         position = parseFloat(slider.value);
     }
 
-    if (isNaN(position) || position < -1000 || position > 1000) {
-        alert('Please enter a valid position between -1000 and 1000 rad');
+    if (isNaN(position) || position < POSITION_SLIDER_MIN || position > POSITION_SLIDER_MAX) {
+        alert('Please enter a valid position between -100π and +100π rad');
         return;
     }
 
     syncPositionControls(position);
     await sendCommand(`SET_POSITION:${position.toFixed(3)}`);
+}
+
+async function getVelocity() {
+    await sendCommand('GET_VELOCITY');
 }
 
 async function getPosition() {
@@ -1064,6 +1117,28 @@ function updateVelocityRampDisplay(velocityRamp) {
         if (!motionProfileInputLocked(input)) {
             input.value = parseFloat(velocityRamp).toFixed(2);
         }
+    }
+}
+
+async function requestDfuMode() {
+    if (!state.isConnected || !state.port) {
+        alert('Connect to the controller first.');
+        return;
+    }
+
+    const confirmed = window.confirm('Enter DFU mode now? The controller will reset and the serial connection will disconnect.');
+    if (!confirmed) {
+        return;
+    }
+
+    stopTelemetryPolling();
+    appendDebugConsole('SYS Entering DFU mode', 'sys');
+
+    try {
+        await sendCommand('SET_MODE_DFU');
+    } catch (error) {
+        console.error('Failed to enter DFU mode:', error);
+        appendDebugConsole(`ERR DFU request failed: ${error}`, 'err');
     }
 }
 
@@ -1279,6 +1354,11 @@ function drawTracePlot() {
         return;
     }
 
+    const themeVars = getComputedStyle(document.documentElement);
+    const plotAxisColor = themeVars.getPropertyValue('--plot-axis').trim() || 'rgba(148, 163, 184, 0.55)';
+    const plotZeroColor = themeVars.getPropertyValue('--plot-zero').trim() || 'rgba(37, 99, 235, 0.75)';
+    const plotLabelColor = themeVars.getPropertyValue('--plot-label').trim() || 'rgba(82, 98, 119, 0.92)';
+
     const ctx = canvas.getContext('2d');
     const width = canvas.width;
     const height = canvas.height;
@@ -1305,7 +1385,7 @@ function drawTracePlot() {
     ctx.clearRect(0, 0, width, height);
 
     ctx.save();
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+    ctx.strokeStyle = plotAxisColor;
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
         const y = paddingY + (innerHeight * i / 4);
@@ -1317,7 +1397,7 @@ function drawTracePlot() {
 
     if (!isPositionTrace) {
         const zeroY = mapValueToY(0);
-        ctx.strokeStyle = 'rgba(37, 99, 235, 0.75)';
+        ctx.strokeStyle = plotZeroColor;
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.moveTo(paddingX, zeroY);
@@ -1369,7 +1449,7 @@ function drawTracePlot() {
         drawSeries(measuredHistory, '#14b8a6', '#2563eb', '#0f766e');
     }
 
-    ctx.fillStyle = 'rgba(82, 98, 119, 0.92)';
+    ctx.fillStyle = plotLabelColor;
     ctx.font = '12px "Segoe UI Variable", "Segoe UI", sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
@@ -1680,15 +1760,32 @@ async function disconnectSerialPort() {
  * Initialize connection button listener
  */
 document.addEventListener('DOMContentLoaded', function () {
+    applyTheme(loadStoredTheme());
+
     const connectBtn = document.createElement('button');
     connectBtn.textContent = 'Connect Serial Port';
     connectBtn.className = 'connect-button';
     connectBtn.onclick = connectSerialPort;
 
+    const themeBtn = document.createElement('button');
+    themeBtn.id = 'themeToggleBtn';
+    themeBtn.className = 'connect-button toolbar-button';
+    themeBtn.onclick = toggleTheme;
+
+    const dfuBtn = document.createElement('button');
+    dfuBtn.id = 'dfuModeBtn';
+    dfuBtn.textContent = 'DFU';
+    dfuBtn.className = 'connect-button toolbar-button dfu-button';
+    dfuBtn.onclick = requestDfuMode;
+    dfuBtn.style.display = 'none';
+
     const toolbarSlot = document.getElementById('toolbarSlot');
     if (toolbarSlot) {
+        toolbarSlot.appendChild(themeBtn);
+        toolbarSlot.appendChild(dfuBtn);
         toolbarSlot.appendChild(connectBtn);
     }
+    applyTheme(state.theme);
 
     syncVelocityControls(parseFloat(document.getElementById('velocityInput')?.value || '1.0'));
     syncPositionControls(parseFloat(document.getElementById('positionInput')?.value || '0.0'));

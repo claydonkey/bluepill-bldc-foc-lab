@@ -15,6 +15,10 @@ That only works after the board has first been prepared with the included bootlo
 
 - [bootloader-dfu-fw.bin](./bootloader-dfu-fw.bin)
 
+## Web Dashboard Snapshot
+
+![Bluepill BLDC FOC Lab web dashboard](./README_assets/bluepill-foc-webapp.png)
+
 ## What This Repo Contains
 
 - `Core/`, `Drivers/`, `Middlewares/`, `USB_DEVICE/`

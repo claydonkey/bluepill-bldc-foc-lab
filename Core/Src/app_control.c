@@ -87,6 +87,7 @@ void set_position(float position)
 {
     const float two_pi = 2.0f * (float)M_PI;
     float current_position = FOC_GetMechanicalPosition();
+    uint8_t mode_changed = (control_mode != MODE_POSITION);
 
     control_mode = MODE_POSITION;
 
@@ -97,7 +98,12 @@ void set_position(float position)
         target_position = position;
     }
 
-    FOC_ResetPID();
+    if (mode_changed) {
+        FOC_ResetPID();
+    } else {
+        /* Preserve the active ramp when retargeting an in-flight position move. */
+        FOC_ResetPIDPreserveRamp();
+    }
 
     char pos_msg[64];
     int len = snprintf(pos_msg, sizeof(pos_msg), "{\"target_pos\":%.3f}\r\n", target_position);

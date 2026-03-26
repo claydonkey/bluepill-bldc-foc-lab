@@ -34,6 +34,84 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             --success: #0f766e;
             --shadow: 0 24px 70px rgba(3, 10, 20, 0.35);
             --shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.08);
+            --container-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(248, 250, 252, 0.96) 100%);
+            --container-border: rgba(255, 255, 255, 0.45);
+            --hero-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.95) 100%);
+            --hero-card-border: rgba(148, 163, 184, 0.22);
+            --hero-stat-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            --hero-stat-border: rgba(148, 163, 184, 0.18);
+            --eyebrow-bg: rgba(37, 99, 235, 0.09);
+            --eyebrow-border: rgba(37, 99, 235, 0.14);
+            --footer-chip-bg: rgba(255, 255, 255, 0.6);
+            --footer-chip-border: rgba(148, 163, 184, 0.2);
+            --toolbar-button-bg: rgba(255, 255, 255, 0.72);
+            --toolbar-button-border: rgba(148, 163, 184, 0.22);
+            --toolbar-button-text: var(--text);
+            --btn-query-bg: rgba(255, 255, 255, 0.92);
+            --btn-query-border: rgba(37, 99, 235, 0.22);
+            --btn-query-text: #1d4ed8;
+            --btn-query-shadow: rgba(37, 99, 235, 0.12);
+            --plot-badge-bg: rgba(255, 255, 255, 0.9);
+            --plot-frame-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            --plot-frame-border: rgba(148, 163, 184, 0.18);
+            --plot-grid: rgba(148, 163, 184, 0.14);
+            --plot-axis: rgba(148, 163, 184, 0.55);
+            --plot-zero: rgba(37, 99, 235, 0.75);
+            --plot-label: rgba(82, 98, 119, 0.92);
+            --field-bg: rgba(255, 255, 255, 0.96);
+            --field-border: rgba(148, 163, 184, 0.22);
+            --debug-item-bg: rgba(255, 255, 255, 0.96);
+            --debug-item-border: rgba(148, 163, 184, 0.18);
+            --info-box-bg: linear-gradient(145deg, rgba(219, 234, 254, 0.8) 0%, rgba(224, 242, 254, 0.95) 100%);
+            --info-box-border: rgba(37, 99, 235, 0.14);
+            --subpanel-bg: rgba(255, 255, 255, 0.58);
+            --subpanel-border: rgba(148, 163, 184, 0.2);
+        }
+
+        :root[data-theme="dark"] {
+            --bg-1: #030712;
+            --bg-2: #0b1120;
+            --bg-3: #10233f;
+            --panel: rgba(15, 23, 42, 0.92);
+            --panel-soft: rgba(15, 23, 42, 0.96);
+            --panel-strong: rgba(17, 24, 39, 0.98);
+            --text: #e2e8f0;
+            --muted: #9fb0c7;
+            --border: rgba(148, 163, 184, 0.18);
+            --shadow: 0 24px 70px rgba(2, 6, 23, 0.58);
+            --shadow-soft: 0 12px 30px rgba(2, 6, 23, 0.32);
+            --container-bg: linear-gradient(180deg, rgba(9, 14, 24, 0.92) 0%, rgba(13, 20, 34, 0.96) 100%);
+            --container-border: rgba(148, 163, 184, 0.14);
+            --hero-card-bg: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(20, 31, 52, 0.96) 100%);
+            --hero-card-border: rgba(148, 163, 184, 0.16);
+            --hero-stat-bg: linear-gradient(180deg, rgba(17, 24, 39, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
+            --hero-stat-border: rgba(148, 163, 184, 0.14);
+            --eyebrow-bg: rgba(37, 99, 235, 0.16);
+            --eyebrow-border: rgba(96, 165, 250, 0.24);
+            --footer-chip-bg: rgba(15, 23, 42, 0.82);
+            --footer-chip-border: rgba(148, 163, 184, 0.16);
+            --toolbar-button-bg: rgba(15, 23, 42, 0.86);
+            --toolbar-button-border: rgba(148, 163, 184, 0.16);
+            --toolbar-button-text: #e2e8f0;
+            --btn-query-bg: rgba(15, 23, 42, 0.94);
+            --btn-query-border: rgba(96, 165, 250, 0.28);
+            --btn-query-text: #93c5fd;
+            --btn-query-shadow: rgba(96, 165, 250, 0.14);
+            --plot-badge-bg: rgba(15, 23, 42, 0.92);
+            --plot-frame-bg: linear-gradient(180deg, rgba(8, 14, 26, 0.98) 0%, rgba(12, 20, 36, 0.98) 100%);
+            --plot-frame-border: rgba(148, 163, 184, 0.16);
+            --plot-grid: rgba(148, 163, 184, 0.11);
+            --plot-axis: rgba(148, 163, 184, 0.4);
+            --plot-zero: rgba(96, 165, 250, 0.72);
+            --plot-label: rgba(159, 176, 199, 0.92);
+            --field-bg: rgba(15, 23, 42, 0.96);
+            --field-border: rgba(148, 163, 184, 0.16);
+            --debug-item-bg: rgba(15, 23, 42, 0.96);
+            --debug-item-border: rgba(148, 163, 184, 0.16);
+            --info-box-bg: linear-gradient(145deg, rgba(10, 25, 47, 0.92) 0%, rgba(15, 32, 58, 0.96) 100%);
+            --info-box-border: rgba(96, 165, 250, 0.18);
+            --subpanel-bg: rgba(15, 23, 42, 0.54);
+            --subpanel-border: rgba(148, 163, 184, 0.14);
         }
 
         body {
@@ -48,18 +126,20 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             justify-content: center;
             padding: 28px 18px 40px;
             color: var(--text);
+            transition: background 0.25s ease, color 0.25s ease;
         }
 
         .container {
             position: relative;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(248, 250, 252, 0.96) 100%);
+            background: var(--container-bg);
             backdrop-filter: blur(24px);
             border-radius: 32px;
             box-shadow: var(--shadow);
             padding: 30px;
             max-width: 1180px;
             width: 100%;
-            border: 1px solid rgba(255, 255, 255, 0.45);
+            border: 1px solid var(--container-border);
+            transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
         }
 
         h1 {
@@ -76,14 +156,14 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
 
         .hero {
             display: grid;
-            grid-template-columns: 1.35fr 0.95fr;
+            grid-template-columns: 1.22fr 0.95fr;
             gap: 18px;
             align-items: stretch;
             margin-bottom: 26px;
         }
 
         .hero-copy {
-            max-width: 760px;
+            max-width: 100%;
             padding: 8px 0 0;
         }
 
@@ -94,8 +174,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             margin-bottom: 12px;
             padding: 7px 12px;
             border-radius: 999px;
-            background: rgba(37, 99, 235, 0.09);
-            border: 1px solid rgba(37, 99, 235, 0.14);
+            background: var(--eyebrow-bg);
+            border: 1px solid var(--eyebrow-border);
             color: var(--accent-3);
             font-size: 0.76rem;
             font-weight: 700;
@@ -115,13 +195,15 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             display: grid;
             gap: 12px;
             align-content: start;
+            width: 100%;
+            justify-self: stretch;
         }
 
         .hero-card {
             padding: 18px 20px;
             border-radius: 22px;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.95) 100%);
-            border: 1px solid rgba(148, 163, 184, 0.22);
+            background: var(--hero-card-bg);
+            border: 1px solid var(--hero-card-border);
             box-shadow: var(--shadow-soft);
         }
 
@@ -134,8 +216,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
         .hero-stat {
             padding: 14px 16px;
             border-radius: 18px;
-            background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: var(--hero-stat-bg);
+            border: 1px solid var(--hero-stat-border);
         }
 
         .hero-stat-label {
@@ -203,8 +285,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             align-items: center;
             padding: 6px 10px;
             border-radius: 999px;
-            background: rgba(255, 255, 255, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.2);
+            background: var(--footer-chip-bg);
+            border: 1px solid var(--footer-chip-border);
             color: var(--text);
             font-weight: 600;
             letter-spacing: 0.01em;
@@ -278,8 +360,37 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
         }
 
         .status-inline-button {
-            min-width: 140px;
-            padding: 10px 14px;
+            min-width: 0;
+            width: 46px;
+            height: 46px;
+            padding: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .status-inline-button.polling-live {
+            background: linear-gradient(145deg, #0f766e 0%, #14b8a6 100%);
+            color: white;
+            border: 1px solid rgba(15, 118, 110, 0.5);
+        }
+
+        .status-inline-button.polling-live:hover {
+            box-shadow: 0 10px 20px rgba(15, 118, 110, 0.24);
+        }
+
+        .status-inline-button.polling-paused {
+            background: linear-gradient(145deg, #dc2626 0%, #ef4444 100%);
+            color: white;
+            border: 1px solid rgba(220, 38, 38, 0.5);
+        }
+
+        .status-inline-button.polling-paused:hover {
+            box-shadow: 0 10px 20px rgba(239, 68, 68, 0.24);
         }
 
         .status-label {
@@ -490,21 +601,30 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
         }
 
         .btn-primary {
-            background: linear-gradient(145deg, var(--accent-2) 0%, #38bdf8 100%);
+            border: none;
+            background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent-3) 100%);
             color: white;
+            box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
         }
 
         .btn-primary:hover {
-            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.22);
+            transform: translateY(-1px);
+            box-shadow: 0 16px 30px rgba(37, 99, 235, 0.28);
+            filter: saturate(1.04);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
         }
 
         .btn-secondary {
-            background: linear-gradient(145deg, var(--surface-button) 0%, #475569 100%);
-            color: white;
+            background: var(--btn-query-bg);
+            color: var(--btn-query-text);
+            border: 1px solid var(--btn-query-border);
         }
 
         .btn-secondary:hover {
-            box-shadow: 0 10px 20px rgba(51, 65, 85, 0.2);
+            box-shadow: 0 10px 20px var(--btn-query-shadow);
         }
 
         .btn-accent {
@@ -536,12 +656,11 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
         }
 
         .info-box {
-            background: linear-gradient(145deg, rgba(219, 234, 254, 0.8) 0%, rgba(224, 242, 254, 0.95) 100%);
-            border: 1px solid rgba(37, 99, 235, 0.14);
+            background: var(--info-box-bg);
+            border: 1px solid var(--info-box-border);
             border-left: 4px solid var(--accent-2);
             border-radius: 18px;
             padding: 16px 18px;
-            margin-top: 20px;
             font-size: 0.9em;
             color: var(--text);
         }
@@ -562,9 +681,58 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             align-items: center;
             gap: 10px;
             padding: 11px 13px;
-            background: rgba(255, 255, 255, 0.96);
+            background: var(--debug-item-bg);
             border-radius: 14px;
-            border: 1px solid rgba(148, 163, 184, 0.18);
+            border: 1px solid var(--debug-item-border);
+        }
+
+        .section-break {
+            margin-top: 20px !important;
+        }
+
+        .control-subpanel {
+            background: var(--subpanel-bg);
+            border: 1px solid var(--subpanel-border);
+            border-radius: 18px;
+            padding: 8px;
+        }
+
+        .control-subpanel .stack-label:first-child {
+            margin-top: 0 !important;
+        }
+
+        .subpanel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .subpanel-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+            font-weight: 700;
+        }
+
+        .subpanel-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 10px;
+            border-radius: 12px;
+            background: var(--debug-item-bg);
+            border: 1px solid var(--debug-item-border);
+            color: var(--text);
+            font-size: 0.88rem;
+            line-height: 1.2;
+        }
+
+        .subpanel-status strong {
+            color: var(--muted);
+            font-weight: 600;
         }
 
         .debug-label {
@@ -620,7 +788,7 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             align-items: center;
             gap: 8px;
             padding: 8px 12px;
-            background: white;
+            background: var(--plot-badge-bg);
             border: 1px solid var(--border);
             border-radius: 999px;
         }
@@ -634,8 +802,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
 
         .plot-frame {
             position: relative;
-            background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
-            border: 1px solid rgba(148, 163, 184, 0.18);
+            background: var(--plot-frame-bg);
+            border: 1px solid var(--plot-frame-border);
             border-radius: 20px;
             padding: 12px;
             overflow: hidden;
@@ -646,8 +814,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             position: absolute;
             inset: 0;
             background:
-                linear-gradient(to right, rgba(148, 163, 184, 0.14) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(148, 163, 184, 0.14) 1px, transparent 1px);
+                linear-gradient(to right, var(--plot-grid) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--plot-grid) 1px, transparent 1px);
             background-size: 12.5% 25%;
             pointer-events: none;
         }
@@ -658,6 +826,36 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             width: 100%;
             height: 220px;
             border-radius: 12px;
+        }
+
+        select,
+        input[type="number"],
+        input[type="text"],
+        textarea {
+            background: var(--field-bg);
+            color: var(--text);
+            border-color: var(--field-border);
+        }
+
+        :root[data-theme="dark"] select,
+        :root[data-theme="dark"] input[type="number"],
+        :root[data-theme="dark"] input[type="text"],
+        :root[data-theme="dark"] textarea {
+            background: var(--field-bg) !important;
+            color: var(--text) !important;
+            border: 1px solid var(--field-border) !important;
+            box-shadow: none;
+        }
+
+        :root[data-theme="dark"] select option {
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+
+        :root[data-theme="dark"] input::placeholder,
+        :root[data-theme="dark"] textarea::placeholder {
+            color: var(--muted);
+            opacity: 1;
         }
 
         .debug-console {
@@ -705,9 +903,11 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
 
 
         .toolbar-slot {
-            position: absolute;
-            top: 24px;
-            right: 24px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            margin-bottom: 16px;
         }
 
         .connect-button {
@@ -717,16 +917,20 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             gap: 10px;
             min-height: 48px;
             padding: 0 18px;
-            border: none;
             border-radius: 14px;
-            background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent-3) 100%);
-            color: #fff;
             font-size: 0.95rem;
             font-weight: 700;
             letter-spacing: 0.01em;
-            box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
             cursor: pointer;
-            transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+        }
+
+        .connect-button {
+            display: inline-flex;
+            border: none;
+            background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent-3) 100%);
+            color: #fff;
+            box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
         }
 
         .connect-button:hover {
@@ -739,6 +943,36 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             transform: translateY(0);
         }
 
+        .toolbar-button {
+            border: 1px solid var(--toolbar-button-border);
+            background: var(--toolbar-button-bg);
+            color: var(--toolbar-button-text);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        .toolbar-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+            filter: none;
+        }
+
+        .toolbar-button:active {
+            transform: translateY(0);
+        }
+
+        .dfu-button {
+            border: 1px solid rgba(220, 38, 38, 0.24);
+            background: linear-gradient(135deg, #dc2626 0%, #f97316 100%);
+            color: #fff;
+            box-shadow: 0 12px 24px rgba(220, 38, 38, 0.2);
+        }
+
+        .dfu-button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 14px 28px rgba(220, 38, 38, 0.28);
+            filter: saturate(1.03);
+        }
+
         @media (max-width: 920px) {
             .hero {
                 grid-template-columns: 1fr;
@@ -747,6 +981,12 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             .page-grid {
                 grid-template-columns: 1fr;
             }
+
+            .hero-status {
+                width: 100%;
+                justify-self: stretch;
+            }
+
         }
 
         @media (max-width: 640px) {
@@ -771,7 +1011,6 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             }
 
             .toolbar-slot {
-                position: static;
                 margin-bottom: 12px;
             }
         }
@@ -818,8 +1057,64 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
         <div class="page-grid">
             <div class="left-column">
                 <div class="panel">
+                    <div class="gauge-container">
+                        <div class="gauge">
+                            <div class="gauge-label">Current Velocity</div>
+                            <div class="gauge-value" id="velocity">0.00</div>
+                            <div class="gauge-unit">rad/s</div>
+                        </div>
+                        <div class="gauge target">
+                            <div class="gauge-label">Target Velocity</div>
+                            <div class="gauge-value" id="targetVelocity">0.00</div>
+                            <div class="gauge-unit">rad/s</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="plot-panel">
+                        <div class="plot-meta">
+                            <span class="plot-badge">
+                                <span class="plot-badge-dot"></span>
+                                <span>Actual velocity history</span>
+                            </span>
+                            <span id="tracePlotMeta">Window: 0 samples | Scale: ±0.50 rad/s</span>
+                        </div>
+                        <div class="input-group">
+                            <select id="traceModeSelect" onchange="setTraceMode()">
+                                <option value="velocity" selected>Velocity Trace</option>
+                                <option value="position">Position Trace</option>
+                            </select>
+                            <button class="btn-secondary" onclick="exportTraceData()">Export Trace + Console</button>
+                        </div>
+                        <div class="plot-frame">
+                            <canvas id="tracePlot" class="plot-canvas" width="640" height="220"></canvas>
+                        </div>
+                        <div class="subtle-note" id="tracePlotNote">
+                            Rolling trace of measured velocity from FOC telemetry.
+                        </div>
+                        <div class="status-item" style="margin-top: 12px;">
+                            <span class="status-label">Polling</span>
+                            <div class="status-item-controls">
+                                <button class="btn-secondary status-inline-button" id="pollingToggleBtn"
+                                    onclick="toggleTelemetryPolling()">⏸</button>
+                                <span class="status-inline-value" id="pollingStateLabel">Live at 200 ms</span>
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <span class="status-label">Polling Interval</span>
+                            <div class="status-item-controls">
+                                <input type="range" id="pollingSlider" class="range-input" min="100" max="2000" step="50"
+                                    value="200" oninput="updateTelemetryPollingInterval(this.value)">
+                                <span class="status-inline-value" id="pollingIntervalValue">200 ms</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
                     <div class="panel-header">
-                        <h2>Live Status</h2>
+                        <h2>Status</h2>
                     </div>
                     <div class="status-item">
                         <span class="status-label">Connection Status</span>
@@ -828,22 +1123,6 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                     <div class="status-item">
                         <span class="status-label">Last Update</span>
                         <span class="status-value" id="lastUpdate">N/A</span>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Polling</span>
-                        <div class="status-item-controls">
-                            <button class="btn-secondary status-inline-button" id="pollingToggleBtn"
-                                onclick="toggleTelemetryPolling()">Pause Polling</button>
-                            <span class="status-inline-value" id="pollingStateLabel">Live at 200 ms</span>
-                        </div>
-                    </div>
-                    <div class="status-item">
-                        <span class="status-label">Polling Interval</span>
-                        <div class="status-item-controls">
-                            <input type="range" id="pollingSlider" class="range-input" min="100" max="2000" step="50"
-                                value="200" oninput="updateTelemetryPollingInterval(this.value)">
-                            <span class="status-inline-value" id="pollingIntervalValue">200 ms</span>
-                        </div>
                     </div>
                     <div class="status-item">
                         <span class="status-label">Alignment Offset</span>
@@ -873,52 +1152,6 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
 
                 <div class="panel">
                     <div class="panel-header">
-                        <h2>Velocity</h2>
-                    </div>
-                    <div class="gauge-container">
-                        <div class="gauge">
-                            <div class="gauge-label">Current Velocity</div>
-                            <div class="gauge-value" id="velocity">0.00</div>
-                            <div class="gauge-unit">rad/s</div>
-                        </div>
-                        <div class="gauge target">
-                            <div class="gauge-label">Target Velocity</div>
-                            <div class="gauge-value" id="targetVelocity">0.00</div>
-                            <div class="gauge-unit">rad/s</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="panel">
-                    <div class="panel-header">
-                        <h2>Velocity Trace</h2>
-                    </div>
-                    <div class="plot-panel">
-                        <div class="plot-meta">
-                            <span class="plot-badge">
-                                <span class="plot-badge-dot"></span>
-                                <span>Actual velocity history</span>
-                            </span>
-                            <span id="tracePlotMeta">Window: 0 samples | Scale: ±0.50 rad/s</span>
-                        </div>
-                        <div class="input-group">
-                            <select id="traceModeSelect" onchange="setTraceMode()">
-                                <option value="velocity" selected>Velocity Trace</option>
-                                <option value="position">Position Trace</option>
-                            </select>
-                            <button class="btn-secondary" onclick="exportTraceData()">Export Trace + Console</button>
-                        </div>
-                        <div class="plot-frame">
-                            <canvas id="tracePlot" class="plot-canvas" width="640" height="220"></canvas>
-                        </div>
-                        <div class="subtle-note" id="tracePlotNote">
-                            Rolling trace of measured velocity from FOC telemetry.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="panel">
-                    <div class="panel-header">
                         <h2>Debug Console</h2>
                     </div>
                     <div class="debug-console">
@@ -942,66 +1175,72 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                         <h2>Motor Control</h2>
                     </div>
                     <div class="control-stack">
-                        <div class="stack-label">Run Control</div>
                         <div class="button-group">
                             <button class="btn-start" onclick="sendCommand('START')">Start Motor</button>
                             <button class="btn-stop" onclick="sendCommand('STOP')">Stop Motor</button>
                         </div>
 
-                        <div class="stack-label">Speed Command</div>
-                        <div class="range-stack" style="margin-bottom: 12px;">
-                            <input type="range" id="velocitySlider" class="range-input" min="-100" max="100" step="0.1"
-                                value="1.0" oninput="syncVelocityFromSlider()">
-                            <div class="range-meta">
-                                <span>-100 rad/s</span>
-                                <span>100 rad/s</span>
+                        <div class="control-subpanel">
+                            <div class="stack-label" style="margin-bottom: 8px; text-align: center;">Velocity</div>
+                            <div class="range-stack" style="margin-bottom: 12px;">
+                                <input type="range" id="velocitySlider" class="range-input" min="-100" max="100" step="0.1"
+                                    value="1.0" oninput="syncVelocityFromSlider()">
+                                <div class="range-meta">
+                                    <span>-100 rad/s</span>
+                                    <span>100 rad/s</span>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <input type="number" id="velocityInput" placeholder="Enter target velocity (rad/s)"
+                                    step="0.1" min="-100" max="100" value="1.0" oninput="syncVelocityFromInput()">
+                                <button class="btn-primary" onclick="setVelocity()">Set</button>
+                                <button class="btn-secondary" onclick="getVelocity()">Get</button>
                             </div>
                         </div>
-                        <div class="input-group">
-                            <input type="number" id="velocityInput" placeholder="Enter target velocity (rad/s)"
-                                step="0.1" min="-100" max="100" value="1.0" oninput="syncVelocityFromInput()">
-                            <button class="btn-primary" onclick="setVelocity()">Set
-                                Velocity</button>
-                        </div>
 
-                        <div class="stack-label">Position Command</div>
-                        <div class="range-stack" style="margin-bottom: 12px;">
-                            <input type="range" id="positionSlider" class="range-input" min="-31.416" max="31.416" step="0.01"
-                                value="0.0" oninput="syncPositionFromSlider()">
-                            <div class="range-meta">
-                                <span>-10π rad</span>
-                                <span>+10π rad</span>
+                        <div class="control-subpanel">
+                            <div class="stack-label" style="margin-bottom: 8px; text-align: center;">Position</div>
+                            <div class="range-stack" style="margin-bottom: 12px;">
+                                <input type="range" id="positionSlider" class="range-input" min="-314.159" max="314.159" step="0.01"
+                                    value="0.0" oninput="syncPositionFromSlider()">
+                                <div class="range-meta">
+                                    <span>-100π rad</span>
+                                    <span>+100π rad</span>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <input type="number" id="positionInput" placeholder="Enter target position (rad)"
+                                    step="0.1" min="-314.159" max="314.159" value="0.0" oninput="syncPositionFromInput()">
+                                <button class="btn-primary" onclick="setPosition()">Set</button>
+                                <button class="btn-secondary" onclick="getPosition()">Get</button>
                             </div>
                         </div>
-                        <div class="input-group">
-                            <input type="number" id="positionInput" placeholder="Enter target position (rad)"
-                                step="0.1" min="-1000" max="1000" value="0.0" oninput="syncPositionFromInput()">
-                            <button class="btn-primary" onclick="setPosition()">Set
-                                Position</button>
-                            <button class="btn-secondary" onclick="getPosition()">Get
-                                Position</button>
-                        </div>
 
-                        <div class="stack-label">Open-Loop Tools</div>
+                        <div class="control-subpanel">
+                            <div class="stack-label" style="margin-bottom: 8px;">Modulation</div>
+                            <div class="input-group">
+                                <select id="modulationSelect">
+                                    <option value="SVPWM">SVPWM</option>
+                                    <option value="SINE" selected>Sine PWM</option>
+                                </select>
+                                <button class="btn-primary" onclick="setModulation()">Set</button>
+                                <button class="btn-secondary" onclick="getModulation()">Get</button>
+                            </div>
+                        </div>
+                        <div class="stack-label" style="margin-top: 14px;">Open-Loop Tools</div>
                         <div class="button-group">
                             <button class="btn-warm" onclick="startOpenLoop()">Start Open
                                 Loop</button>
                             <div></div>
                         </div>
-
-                        <div class="stack-label">Modulation</div>
-                        <div class="input-group">
-                            <select id="modulationSelect">
-                                <option value="SVPWM">SVPWM</option>
-                                <option value="SINE" selected>Sine PWM</option>
-                            </select>
-                            <button class="btn-accent" onclick="setModulation()">Set
-                                Modulation</button>
-                            <button class="btn-secondary" onclick="getModulation()">Get
-                                Modulation</button>
-                        </div>
                     </div>
 
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Bring-up Notes</h2>
+                    </div>
                     <div class="info-box">
                         <strong>Bring-up workflow:</strong> Start with vector tests, then open loop, then closed loop.
                         If all vector tests feel the same, treat that as a likely hardware or driver-mode issue.
@@ -1012,59 +1251,70 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                     <div class="panel-header">
                         <h2>PID Tuning</h2>
                     </div>
-                    <div class="debug-item" style="margin-bottom: 14px;">
-                        <span class="debug-label">Autotune Status:</span>
-                        <span class="debug-value" id="autotuneStatus">Idle</span>
-                    </div>
-                    <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(3, minmax(0, 1fr));">
-                        <div>
-                            <input type="number" id="kpInput" placeholder="Kp" step="0.1" min="0" max="5" value="0.3"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Proportional</div>
+                    <div class="control-subpanel">
+                        <div class="subpanel-title" style="margin-bottom: 12px;">Velocity</div>
+                        <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(3, minmax(0, 1fr));">
+                            <div>
+                                <input type="number" id="kpInput" placeholder="Kp" step="0.1" min="0" max="5" value="0.3"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 6px;">Proportional</div>
+                            </div>
+                            <div>
+                                <input type="number" id="kiInput" placeholder="Ki" step="0.1" min="0" max="10" value="1.0"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 6px;">Integral</div>
+                            </div>
+                            <div>
+                                <input type="number" id="kdInput" placeholder="Kd" step="0.01" min="0" max="1" value="0.01"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 6px;">Derivative</div>
+                            </div>
                         </div>
-                        <div>
-                            <input type="number" id="kiInput" placeholder="Ki" step="0.1" min="0" max="10" value="1.0"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Integral</div>
+                        <div class="button-group" style="margin-bottom: 0;">
+                            <button class="btn-primary" onclick="setPID()">Set</button>
+                            <button class="btn-secondary" onclick="getPID()">Get</button>
                         </div>
-                        <div>
-                            <input type="number" id="kdInput" placeholder="Kd" step="0.01" min="0" max="1" value="0.01"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Derivative</div>
+                        <div class="subpanel-header" style="margin-top: 12px;">
+                            <div class="subpanel-title">Tuning</div>
+                            <div class="subpanel-status">
+                                <strong>Status:</strong>
+                                <span id="autotuneStatus">Idle</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="button-group" style="margin-bottom: 0;">
-                        <button class="btn-primary" onclick="setPID()">Set PID</button>
-                        <button class="btn-secondary" onclick="getPID()">Get PID</button>
-                    </div>
-                    <div class="button-group" style="margin-top: 12px; margin-bottom: 0;">
-                        <button class="btn-warm" onclick="startAutotune()">Start Autotune</button>
-                        <button class="btn-outline" onclick="applyAutotuneResults()">Apply Suggested</button>
-                    </div>
-                    <div class="stack-label" style="margin-top: 16px;">Position Servo</div>
-                    <div class="debug-item" style="margin-bottom: 14px;">
-                        <span class="debug-label">Position Servo Tune:</span>
-                        <span class="debug-value" id="positionAutotuneStatus">Idle</span>
-                    </div>
-                    <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
-                        <div>
-                            <input type="number" id="posKpInput" placeholder="Position Gain" step="0.1" min="0" max="50" value="1.2"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Position-to-velocity gain</div>
-                        </div>
-                        <div>
-                            <input type="number" id="posKdInput" placeholder="Velocity Damping" step="0.01" min="0" max="5" value="0.04"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Measured-velocity damping term</div>
+                        <div class="button-group" style="margin-top: 12px; margin-bottom: 0;">
+                            <button class="btn-warm" onclick="startAutotune()">Start Autotune</button>
+                            <div></div>
                         </div>
                     </div>
-                    <div class="button-group" style="margin-bottom: 0;">
-                        <button class="btn-primary" onclick="setPositionPID()">Set Position Gain</button>
-                        <button class="btn-secondary" onclick="getPositionPID()">Read Position Gain</button>
-                    </div>
-                    <div class="button-group" style="margin-top: 12px; margin-bottom: 0;">
-                        <button class="btn-warm" onclick="startPositionAutotune()">Start Position Tune</button>
-                        <div></div>
+                    <div class="control-subpanel" style="margin-top: 18px;">
+                        <div class="subpanel-title" style="margin-bottom: 12px;">Position</div>
+                        <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                            <div>
+                                <input type="number" id="posKpInput" placeholder="Position Gain" step="0.1" min="0" max="50" value="1.2"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 6px;">Position-to-velocity gain</div>
+                            </div>
+                            <div>
+                                <input type="number" id="posKdInput" placeholder="Velocity Damping" step="0.01" min="0" max="5" value="0.04"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 6px;">Measured-velocity damping term</div>
+                            </div>
+                        </div>
+                        <div class="button-group" style="margin-bottom: 0;">
+                            <button class="btn-primary" onclick="setPositionPID()">Set</button>
+                            <button class="btn-secondary" onclick="getPositionPID()">Get</button>
+                        </div>
+                        <div class="subpanel-header" style="margin-top: 12px;">
+                            <div class="subpanel-title">Tuning</div>
+                            <div class="subpanel-status">
+                                <strong>Status:</strong>
+                                <span id="positionAutotuneStatus">Idle</span>
+                            </div>
+                        </div>
+                        <div class="button-group" style="margin-top: 12px; margin-bottom: 0;">
+                            <button class="btn-warm" onclick="startPositionAutotune()">Start Autotune</button>
+                            <div></div>
+                        </div>
                     </div>
                 </div>
 
@@ -1072,40 +1322,42 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                     <div class="panel-header">
                         <h2>Motion Profile</h2>
                     </div>
-                    <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: start;">
-                        <div>
-                            <input type="number" id="velocityRampInput" placeholder="Velocity Ramp" step="0.5" min="0.1"
-                                max="200" value="100.0"
-                                oninput="markDirty(this)"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Velocity-mode acceleration limit (rad/s²)</div>
-                        </div>
-                        <div>
-                            <input type="number" id="positionVelocityLimitInput" placeholder="Position Velocity Limit"
-                                step="0.5" min="0.2" max="100" value="40.0"
-                                oninput="markDirty(this)"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Planned max speed in position moves (rad/s)</div>
-                        </div>
-                        <div>
-                            <input type="number" id="positionAccelLimitInput" placeholder="Position Accel Limit"
-                                step="0.5" min="0.1" max="400" value="80.0"
-                                oninput="markDirty(this)"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Profile acceleration limit (rad/s²)</div>
-                        </div>
-                        <div>
-                            <input type="number" id="positionDecelLimitInput" placeholder="Position Decel Limit"
-                                step="0.5" min="0.1" max="400" value="90.0"
-                                oninput="markDirty(this)"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Profile deceleration limit (rad/s²)</div>
-                        </div>
-                        <div style="display: flex; justify-content: center; padding-top: 2px;">
-                            <button class="btn-primary" onclick="setMotionProfile()">Set</button>
-                        </div>
-                        <div style="display: flex; justify-content: center; padding-top: 2px;">
-                            <button class="btn-secondary" onclick="getMotionProfile()">Get</button>
+                    <div class="control-subpanel">
+                        <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: start; row-gap: 16px;">
+                            <div>
+                                <input type="number" id="velocityRampInput" placeholder="Velocity Ramp" step="0.5" min="0.1"
+                                    max="200" value="100.0"
+                                    oninput="markDirty(this)"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 8px;">Velocity accel (rad/s²)</div>
+                            </div>
+                            <div>
+                                <input type="number" id="positionVelocityLimitInput" placeholder="Position Velocity Limit"
+                                    step="0.5" min="0.2" max="100" value="40.0"
+                                    oninput="markDirty(this)"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 8px;">Position velocity cap (rad/s)</div>
+                            </div>
+                            <div>
+                                <input type="number" id="positionAccelLimitInput" placeholder="Position Accel Limit"
+                                    step="0.5" min="0.1" max="400" value="80.0"
+                                    oninput="markDirty(this)"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 8px;">Position accel (rad/s²)</div>
+                            </div>
+                            <div>
+                                <input type="number" id="positionDecelLimitInput" placeholder="Position Decel Limit"
+                                    step="0.5" min="0.1" max="400" value="90.0"
+                                    oninput="markDirty(this)"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 8px;">Position decel (rad/s²)</div>
+                            </div>
+                            <div style="display: flex; justify-content: center; padding-top: 2px;">
+                                <button class="btn-primary" onclick="setMotionProfile()">Set</button>
+                            </div>
+                            <div style="display: flex; justify-content: center; padding-top: 2px;">
+                                <button class="btn-secondary" onclick="getMotionProfile()">Get</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1114,23 +1366,25 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                     <div class="panel-header">
                         <h2>Torque Assist</h2>
                     </div>
-                    <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
-                        <div>
-                            <input type="number" id="feedforwardVoltageInput" placeholder="Feedforward Voltage"
-                                step="0.1" min="0" max="6" value="0.8"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Low-speed feedforward voltage</div>
+                    <div class="control-subpanel">
+                        <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                            <div>
+                                <input type="number" id="feedforwardVoltageInput" placeholder="Feedforward Voltage"
+                                    step="0.1" min="0" max="6" value="0.8"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                <div class="subtle-note" style="margin-top: 6px;">Low-speed feedforward voltage</div>
+                            </div>
+                            <div>
+                                <input type="number" id="feedforwardFadeInput" placeholder="Fade Speed" step="0.1" min="0.1"
+                                    max="20" value="3.0"
+                                    style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                    <div class="subtle-note" style="margin-top: 6px;">Fade out by this velocity (rad/s)</div>
+                            </div>
                         </div>
-                        <div>
-                            <input type="number" id="feedforwardFadeInput" placeholder="Fade Speed" step="0.1" min="0.1"
-                                max="20" value="3.0"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Fade out by this speed (rad/s)</div>
+                        <div class="button-group" style="margin-bottom: 0;">
+                            <button class="btn-primary" onclick="setFeedforward()">Set</button>
+                            <button class="btn-secondary" onclick="getFeedforward()">Get</button>
                         </div>
-                    </div>
-                    <div class="button-group" style="margin-bottom: 0;">
-                        <button class="btn-accent" onclick="setFeedforward()">Set Feedforward</button>
-                        <button class="btn-secondary" onclick="getFeedforward()">Get Feedforward</button>
                     </div>
                 </div>
 
@@ -1160,27 +1414,28 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                                     <option value="4">Phase Map 4: C,A,B</option>
                                     <option value="5">Phase Map 5: C,B,A</option>
                                 </select>
-                                <button class="btn-secondary" onclick="setPhaseMap()">Set Phase
-                                    Map</button>
+                                <button class="btn-primary" onclick="setPhaseMap()">Set</button>
                             </div>
-                            <div class="stack-label" style="margin-bottom: 8px;">Low-Speed Bias</div>
-                            <div class="debug-grid" style="margin-bottom: 12px; grid-template-columns: repeat(2, minmax(0, 1fr));">
-                                <div>
-                                    <input type="number" id="lowSpeedBiasVoltageInput" placeholder="Bias Voltage"
-                                        step="0.05" min="0" max="6" value="0.35"
-                                        style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                                    <div class="subtle-note" style="margin-top: 6px;">Extra low-speed torque bias (V)</div>
+                            <div class="control-subpanel" style="margin-bottom: 18px;">
+                                <div class="stack-label" style="margin-bottom: 8px;">Low-Velocity Bias</div>
+                                <div class="debug-grid" style="margin-bottom: 12px; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                                    <div>
+                                        <input type="number" id="lowSpeedBiasVoltageInput" placeholder="Bias Voltage"
+                                            step="0.05" min="0" max="6" value="0.35"
+                                            style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                        <div class="subtle-note" style="margin-top: 6px;">Extra low-speed torque bias (V)</div>
+                                    </div>
+                                    <div>
+                                        <input type="number" id="lowSpeedBiasFadeInput" placeholder="Bias Fade Velocity"
+                                            step="0.1" min="0.1" max="20" value="1.5"
+                                            style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
+                                        <div class="subtle-note" style="margin-top: 6px;">Fade out by this velocity (rad/s)</div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <input type="number" id="lowSpeedBiasFadeInput" placeholder="Bias Fade Speed"
-                                        step="0.1" min="0.1" max="20" value="1.5"
-                                        style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                                    <div class="subtle-note" style="margin-top: 6px;">Fade out by this speed (rad/s)</div>
+                                <div class="button-group" style="margin-bottom: 0;">
+                                    <button class="btn-primary" onclick="setLowSpeedBias()">Set</button>
+                                    <button class="btn-secondary" onclick="getLowSpeedBias()">Get</button>
                                 </div>
-                            </div>
-                            <div class="button-group" style="margin-bottom: 18px;">
-                                <button class="btn-accent" onclick="setLowSpeedBias()">Set Bias</button>
-                                <button class="btn-secondary" onclick="getLowSpeedBias()">Get Bias</button>
                             </div>
                             <div class="debug-grid">
                                 <div class="debug-item">

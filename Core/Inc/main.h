@@ -53,6 +53,7 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
+void enter_dfu_mode(void);
 
 /* USER CODE END EFP */
 

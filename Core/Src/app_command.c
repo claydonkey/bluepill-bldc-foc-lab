@@ -45,6 +45,12 @@ void AppCommand_Process(const char *cmd_buf, uint32_t len)
 
     if (strcmp(command, "PING") == 0) {
         tx_json("{\"ping\":\"pong\"}\r\n");
+    } else if ((strcmp(command, "SET_MODE_DFU") == 0) ||
+               (strcmp(command, "ENTER_DFU") == 0) ||
+               (strcmp(command, "DFU") == 0)) {
+        tx_json("{\"dfu\":\"entering\"}\r\n");
+        HAL_Delay(25);
+        enter_dfu_mode();
     } else if (strcmp(command, "GET_STATUS") == 0) {
         char status_msg[160];
         int status_len = snprintf(status_msg, sizeof(status_msg),
