@@ -46,6 +46,7 @@ Typical setup:
 - 3-phase motor driver connected to the PWM outputs
 - AS5600 magnetic encoder
 - USB connection to the PC for telemetry and DFU flashing
+- optional HC-05 on `USART2` for wireless command/control experiments
 
 You will also need a way to perform the very first bootloader flash, such as:
 
@@ -334,6 +335,13 @@ Current key modules include:
 - The firmware uses float `printf` / `scanf` support in CMake.
 - The DFU flow depends on the bootloader being present first.
 - The firmware is currently optimized through the `Release` preset.
+- HC-05 support is present in the firmware as an optional secondary command transport.
+
+## Current Status
+
+- Velocity control and live telemetry are in good working shape for bench testing.
+- Position control is still under active tuning and should be treated as experimental.
+- The browser dashboard is the primary supported UI for tuning, logging, and DFU entry.
 
 ## Troubleshooting
 

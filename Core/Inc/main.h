@@ -75,7 +75,7 @@ void enter_dfu_mode(void);
 #define PWM1c_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
-#define HC05_ENABLED 0
+#define HC05_ENABLED 1
 #define USB_RX_BUFFER_SIZE 64 // A suitable buffer size for your usb commands
 #define UART_RX_BUFFER_SIZE 96
 extern uint8_t usb_rx_buffer[USB_RX_BUFFER_SIZE];

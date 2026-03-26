@@ -46,7 +46,7 @@ and also sends control/tuning commands such as:
 The firmware also sends a startup ready message:
 
 ```json
-{"status":"ready","fw":"trace_dbg_3"}
+{"status":"ready"}
 ```
 
 ## Main Commands
@@ -121,9 +121,8 @@ The firmware returns a compact, scaled packet:
 
 ```json
 {
-  "foc": {
-    "fw": "trace_dbg_3",
-    "vi": 123,
+    "foc": {
+      "vi": 123,
     "mechi": 4567,
     "mrawi": 4501,
     "pmrawi": 4400,
@@ -189,7 +188,6 @@ Scale by `1000`:
 
 Not scaled:
 
-- `fw` -> firmware tag
 - `usat` -> `1` if voltage output is saturated
 - `mode` -> control mode enum
 - `mod` -> modulation mode enum

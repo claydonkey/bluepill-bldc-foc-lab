@@ -1,5 +1,20 @@
-build
-mx.scratch
-!.settings
+/build/
+/Debug/
 /Release/
 /Release DFU/
+/cmake-build-*/
+/CMakeFiles/
+/README_assets/*.log
+*.elf
+*.bin
+*.dfu
+*.hex
+*.map
+*.list
+*.su
+*.cyclo
+*.d
+*.log
+foc-trace-*.json
+mx.scratch
+!.settings

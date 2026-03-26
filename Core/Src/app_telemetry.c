@@ -12,7 +12,7 @@
 #include <stdio.h>
 #include <string.h>
 
-static char usb_ready_msg[] = "{\"status\":\"ready\",\"fw\":\"trace_dbg_3\"}\r\n";
+static char usb_ready_msg[] = "{\"status\":\"ready\"}\r\n";
 static char foc_telemetry_tx_buffer[448];
 static char foc_diag_tx_buffer[192];
 static FOC_Telemetry_t foc_telemetry_cache = {0};
@@ -65,7 +65,7 @@ void AppTelemetry_UpdateCache(void)
 void AppTelemetry_SendFocSnapshot(void)
 {
     int len = snprintf(foc_telemetry_tx_buffer, sizeof(foc_telemetry_tx_buffer),
-                       "{\"foc\":{\"fw\":\"trace_dbg_3\",\"vi\":%ld,\"mechi\":%ld,\"mrawi\":%ld,\"pmrawi\":%ld,\"mdelti\":%ld,\"pmechi\":%ld,\"ti\":%ld,\"tri\":%ld,\"tpi\":%ld,\"erri\":%ld,\"uqi\":%ld,\"vlimi\":%ld,\"vrampi\":%ld,\"pvlimi\":%ld,\"pacci\":%ld,\"pdeci\":%ld,\"pboosti\":%ld,\"usat\":%u,\"mode\":%u,\"mod\":%u,\"pm\":%u,\"adiri\":%ld,\"aligni\":%ld,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
+                       "{\"foc\":{\"vi\":%ld,\"mechi\":%ld,\"mrawi\":%ld,\"pmrawi\":%ld,\"mdelti\":%ld,\"pmechi\":%ld,\"ti\":%ld,\"tri\":%ld,\"tpi\":%ld,\"erri\":%ld,\"uqi\":%ld,\"vlimi\":%ld,\"vrampi\":%ld,\"pvlimi\":%ld,\"pacci\":%ld,\"pdeci\":%ld,\"pboosti\":%ld,\"usat\":%u,\"mode\":%u,\"mod\":%u,\"pm\":%u,\"adiri\":%ld,\"aligni\":%ld,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
                        (long)telemetry_scale_100(json_safe_float(foc_telemetry_cache.velocity)),
                        (long)telemetry_scale_1000(json_safe_float(foc_telemetry_cache.mechanical_angle)),
                        (long)telemetry_scale_1000(json_safe_float(foc_telemetry_cache.raw_mechanical_angle)),

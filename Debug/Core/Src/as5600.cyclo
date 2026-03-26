@@ -1,7 +1,0 @@
-../Core/Src/as5600.c:33:13:AS5600_TryStartTransfer	4
-../Core/Src/as5600.c:58:13:AS5600_ProcessPendingSample	10
-../Core/Src/as5600.c:101:6:AS5600_StartDMA	1
-../Core/Src/as5600.c:107:6:AS5600_Service	3
-../Core/Src/as5600.c:124:6:HAL_I2C_MemRxCpltCallback	2
-../Core/Src/as5600.c:136:6:HAL_I2C_ErrorCallback	2
-../Core/Src/as5600.c:145:7:AS5600_GetMechanicalAngle	1
