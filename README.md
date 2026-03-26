@@ -1,5 +1,7 @@
 # Bluepill BLDC FOC Lab
 
+[![Live App](https://img.shields.io/badge/Live%20App-GitHub%20Pages-2563eb)](https://claydonkey.github.io/bluepill-bldc-foc-lab/)
+
 This project is a field-oriented control (FOC) motor-control application for a Bluepill-class `STM32F103CBT6` board, with:
 
 - USB CDC command and telemetry
@@ -8,6 +10,10 @@ This project is a field-oriented control (FOC) motor-control application for a B
 - velocity and position control modes
 - runtime tuning and trace export from the web UI
 - DFU-based firmware update support
+
+## Live Demo
+
+[Open the Bluepill BLDC FOC Lab Web App](https://claydonkey.github.io/bluepill-bldc-foc-lab/)
 
 ## Mission
 
