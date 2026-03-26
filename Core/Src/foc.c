@@ -20,7 +20,7 @@ extern TIM_HandleTypeDef htim1;
 #define FOC_DEFAULT_POSITION_ACCEL_LIMIT 100.0f
 #define FOC_DEFAULT_POSITION_DECEL_LIMIT 100.0f
 #define FOC_DEFAULT_POSITION_TORQUE_ASSIST 0.0f
-#define FOC_POSITION_ERROR_DEADBAND_RAD 0.01f
+#define FOC_POSITION_ERROR_DEADBAND_RAD 0.03f
 
 ControlMode_t control_mode = MODE_VELOCITY;
 ModulationMode_t modulation_mode = MODULATION_SINE;
@@ -903,7 +903,7 @@ void FOC_Loop(void)
     {
         float pos_err = target_position - multi_turn_mech_angle;
         float vel_err;
-        float pos_velocity_target = pos_pid.kp * pos_err;
+        float pos_velocity_target = (pos_pid.kp * pos_err) - (pos_pid.kd * velocity);
         float abs_pos_err = fabsf(pos_err);
         float velocity_step_limit;
         float velocity_target;
@@ -920,14 +920,9 @@ void FOC_Loop(void)
         velocity_target = ramped_velocity_target;
         vel_err = velocity_target - velocity;
         Uq = PID_compute(&vel_pid, vel_err, dt);
-        if (abs_pos_err > (FOC_POSITION_ERROR_DEADBAND_RAD * 2.0f))
-        {
-            Uq += compute_low_speed_feedforward(velocity_target);
-            Uq += compute_low_speed_torque_bias(velocity_target, vel_err);
-        }
         err = vel_err;
 
-        if (abs_pos_err <= FOC_POSITION_ERROR_DEADBAND_RAD && fabsf(velocity) < 0.15f && fabsf(velocity_target) < 0.05f)
+        if (abs_pos_err <= FOC_POSITION_ERROR_DEADBAND_RAD && fabsf(velocity) < 0.30f && fabsf(velocity_target) < 0.10f)
         {
             FOC_ResetPID();
             ramped_velocity_target = 0.0f;
