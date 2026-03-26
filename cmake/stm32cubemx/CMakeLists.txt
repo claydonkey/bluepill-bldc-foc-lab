@@ -35,6 +35,10 @@ set(MX_Application_Src
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/tim.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/foc.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/as5600.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/app_autotune.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/app_command.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/app_control.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/app_telemetry.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/pid.c       
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/svpwm.c
     ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f1xx_it.c

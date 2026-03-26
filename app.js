@@ -11,6 +11,11 @@
  */
 
 // Global state
+/*
+ * SPDX-License-Identifier: MIT
+ * Copyright (c) 2026 Anthony Campbell (claydonkey)
+ */
+
 const state = {
     port: null,
     reader: null,
@@ -22,7 +27,7 @@ const state = {
     telemetryPollInFlight: false,
     telemetryPollTimeout: null,
     telemetryPollQuietUntil: 0,
-    telemetryDiagPollDivider: 8,
+    telemetryDiagPollDivider: 40,
     telemetryPollCount: 0,
     lastDiagCallbackCount: null,
     lastDiagCallbackTimestamp: 0,
@@ -30,11 +35,27 @@ const state = {
     velocityHistoryLimit: 120,
     positionHistory: [],
     positionHistoryLimit: 120,
+    targetVelocityHistory: [],
+    targetVelocityHistoryLimit: 120,
+    targetPositionHistory: [],
+    targetPositionHistoryLimit: 120,
+    rawAngleHistory: [],
+    rawAngleHistoryLimit: 120,
+    rawMechanicalHistory: [],
+    rawMechanicalHistoryLimit: 120,
+    previousMechanicalHistory: [],
+    previousMechanicalHistoryLimit: 120,
+    mechanicalDeltaHistory: [],
+    mechanicalDeltaHistoryLimit: 120,
+    previousMultiTurnHistory: [],
+    previousMultiTurnHistoryLimit: 120,
     traceMode: 'velocity',
     autotuneResult: null,
     velocitySliderTimer: null,
     positionSliderTimer: null,
-    motionProfileWritePendingUntil: 0
+    motionProfileWritePendingUntil: 0,
+    debugConsoleLines: [],
+    seenFirmwareTag: null
 };
 
 function delay(ms) {
@@ -57,6 +78,36 @@ function motionProfileInputLocked(input) {
     return !!input && (document.activeElement === input || input.dataset.dirty === '1' || Date.now() < state.motionProfileWritePendingUntil);
 }
 
+function appendDebugConsole(message, type = 'sys') {
+    const frame = document.getElementById('debugConsole');
+    const now = new Date();
+    const stamp = now.toLocaleTimeString();
+    const line = `[${stamp}] ${message}`;
+    state.debugConsoleLines.push({ line, type });
+    if (state.debugConsoleLines.length > 250) {
+        state.debugConsoleLines.shift();
+    }
+    if (!frame) {
+        return;
+    }
+    const row = document.createElement('div');
+    row.className = `debug-console-line debug-console-${type}`;
+    row.textContent = line;
+    frame.appendChild(row);
+    while (frame.childElementCount > 250) {
+        frame.removeChild(frame.firstElementChild);
+    }
+    frame.scrollTop = frame.scrollHeight;
+}
+
+function clearDebugConsole() {
+    state.debugConsoleLines = [];
+    const frame = document.getElementById('debugConsole');
+    if (frame) {
+        frame.innerHTML = '';
+    }
+}
+
 /**
  * Initialize the Web Serial API connection
  */
@@ -72,8 +123,18 @@ async function connectSerialPort() {
         state.telemetryPollCount = 0;
         state.lastDiagCallbackCount = null;
         state.lastDiagCallbackTimestamp = 0;
+        state.velocityHistory = [];
+        state.positionHistory = [];
+        state.targetVelocityHistory = [];
+        state.targetPositionHistory = [];
+        state.rawAngleHistory = [];
+        state.rawMechanicalHistory = [];
+        state.previousMechanicalHistory = [];
+        state.mechanicalDeltaHistory = [];
+        state.previousMultiTurnHistory = [];
         updateConnectionStatus(true);
         console.log('Connected to serial port');
+        appendDebugConsole('SYS Connected to serial port', 'sys');
 
         // Start reading data
         readSerialData();
@@ -94,6 +155,7 @@ async function connectSerialPort() {
         refreshTelemetryPollingUI();
     } catch (error) {
         console.error('Failed to connect:', error);
+        appendDebugConsole(`ERR Connect failed: ${error}`, 'err');
         updateConnectionStatus(false);
     }
 }
@@ -251,6 +313,7 @@ function processInputBuffer() {
                 // Check for status messages
                 else if (data.status !== undefined) {
                     console.log('MCU Status:', data.status);
+                    appendDebugConsole(`RX ${line}`, 'rx');
                 }
                 // Check for alignment offset calibration
                 else if (data.align_offset !== undefined) {
@@ -273,6 +336,12 @@ function processInputBuffer() {
                 // Check for FOC debug information
                 else if (data.foc !== undefined) {
                     const focTelemetry = normalizeFocTelemetry(data.foc);
+                    if (focTelemetry.fw !== undefined) {
+                        if (state.seenFirmwareTag !== focTelemetry.fw) {
+                            state.seenFirmwareTag = focTelemetry.fw;
+                            appendDebugConsole(`SYS Firmware ${focTelemetry.fw}`, 'sys');
+                        }
+                    }
                     updateVelocityDisplay(focTelemetry);
                     updateFOCDebugDisplay(focTelemetry);
                     updateMotionProfileFromTelemetry(focTelemetry);
@@ -284,7 +353,13 @@ function processInputBuffer() {
                 }
                 // Check for diagnostic (loop count, message status)
                 else if (data.diag !== undefined) {
+                    appendDebugConsole(`RX ${line}`, 'rx');
                     updateDiagnosticDisplay(data.diag);
+                    if (state.telemetryPollTimeout) {
+                        clearTimeout(state.telemetryPollTimeout);
+                        state.telemetryPollTimeout = null;
+                    }
+                    state.telemetryPollInFlight = false;
                 }
                 else if (data.open_loop !== undefined) {
                     updateOpenLoopDisplay(data.open_loop);
@@ -330,16 +405,19 @@ function processInputBuffer() {
                     updatePositionAutotuneDisplay(data.position_autotune);
                 } else {
                     console.log('Unknown JSON:', data);
+                    appendDebugConsole(`RX ${line}`, 'rx');
                 }
             }
             // Handle text responses
             else {
                 console.log('MCU Response:', line);
+                appendDebugConsole(`RX ${line}`, 'rx');
             }
         } catch (error) {
             // Not JSON, treat as debug message
             if (line.length > 0) {
                 console.log('MCU Message:', line);
+                appendDebugConsole(`ERR RX parse failed: ${line}`, 'err');
             }
         }
     }
@@ -363,6 +441,10 @@ function normalizeFocTelemetry(focData) {
 
     assignScaled('vi', 'v', 100);
     assignScaled('mechi', 'mech', 1000);
+    assignScaled('mrawi', 'mraw', 1000);
+    assignScaled('pmrawi', 'pmraw', 1000);
+    assignScaled('mdelti', 'mdelta', 1000);
+    assignScaled('pmechi', 'pmech', 1000);
     assignScaled('ti', 't', 100);
     assignScaled('tri', 'tr', 100);
     assignScaled('tpi', 'tp', 1000);
@@ -440,9 +522,11 @@ function updatePIDDisplay(data) {
 function updatePositionPIDDisplay(data) {
     if (data.position_pid) {
         document.getElementById('posKpInput').value = parseFloat(data.position_pid.kp).toFixed(3);
-        document.getElementById('posKiInput').value = parseFloat(data.position_pid.ki).toFixed(3);
-        document.getElementById('posKdInput').value = parseFloat(data.position_pid.kd).toFixed(3);
-        console.log('Position PID updated:', data.position_pid);
+        const posKdInput = document.getElementById('posKdInput');
+        if (posKdInput && data.position_pid.kd !== undefined) {
+            posKdInput.value = parseFloat(data.position_pid.kd).toFixed(3);
+        }
+        console.log('Position gain updated:', data.position_pid);
     }
 }
 
@@ -589,6 +673,9 @@ function updateFOCDebugDisplay(focData) {
     } else if (focData.t !== undefined) {
         document.getElementById('debugTarget').textContent = parseFloat(focData.t).toFixed(3);
     }
+    if (focData.tr !== undefined) {
+        pushTargetVelocitySample(parseFloat(focData.tr));
+    }
 
     // Actual velocity
     if (focData.vel !== undefined) {
@@ -621,6 +708,25 @@ function updateFOCDebugDisplay(focData) {
 
     if (focData.mech !== undefined) {
         pushPositionSample(parseFloat(focData.mech));
+    }
+    if (focData.tp !== undefined) {
+        pushTargetPositionSample(parseFloat(focData.tp));
+        syncPositionControls(parseFloat(focData.tp));
+    }
+    if (focData.r !== undefined) {
+        pushRawAngleSample(parseFloat(focData.r));
+    }
+    if (focData.mraw !== undefined) {
+        pushRawMechanicalSample(parseFloat(focData.mraw));
+    }
+    if (focData.pmraw !== undefined) {
+        pushPreviousMechanicalSample(parseFloat(focData.pmraw));
+    }
+    if (focData.mdelta !== undefined) {
+        pushMechanicalDeltaSample(parseFloat(focData.mdelta));
+    }
+    if (focData.pmech !== undefined) {
+        pushPreviousMultiTurnSample(parseFloat(focData.pmech));
     }
 
     if (focData.lc !== undefined) {
@@ -799,29 +905,28 @@ async function sendCommand(command, options = {}) {
         writer.releaseLock();
         if (!options.silent) {
             console.log('Sent command:', command);
+            appendDebugConsole(`TX ${command}`, 'tx');
         }
         if (!options.silent) {
             state.telemetryPollQuietUntil = Date.now() + 300;
         }
 
-        // Reset FOC status when stopping motor
-        if (command === 'STOP') {
-            document.getElementById('focStatus').textContent = 'Stopped';
-            // Clear debug values
-            document.getElementById('debugTarget').textContent = '—';
-            document.getElementById('debugActual').textContent = '—';
-            document.getElementById('debugError').textContent = '—';
-            document.getElementById('debugUq').textContent = '—';
-            document.getElementById('debugPwmA').textContent = '—';
-            document.getElementById('debugPwmB').textContent = '—';
-            document.getElementById('debugPwmC').textContent = '—';
-            state.velocityHistory = [];
-            state.positionHistory = [];
-            drawTracePlot();
-        }
-    } catch (error) {
+          // Reset FOC status when stopping motor
+          if (command === 'STOP') {
+              document.getElementById('focStatus').textContent = 'Stopped';
+              // Clear debug values
+              document.getElementById('debugTarget').textContent = '—';
+              document.getElementById('debugActual').textContent = '—';
+              document.getElementById('debugError').textContent = '—';
+              document.getElementById('debugUq').textContent = '—';
+              document.getElementById('debugPwmA').textContent = '—';
+              document.getElementById('debugPwmB').textContent = '—';
+              document.getElementById('debugPwmC').textContent = '—';
+          }
+      } catch (error) {
         console.error('Failed to send command:', error);
-    }
+        appendDebugConsole(`ERR TX failed for ${command}: ${error}`, 'err');
+      }
 }
 
 /**
@@ -968,6 +1073,7 @@ function updatePositionVelocityLimitDisplay(positionVelocityLimit) {
         if (!motionProfileInputLocked(input)) {
             input.value = parseFloat(positionVelocityLimit).toFixed(2);
         }
+        input.dataset.appliedValue = parseFloat(positionVelocityLimit).toFixed(2);
     }
 }
 
@@ -1036,13 +1142,17 @@ function updatePositionAutotuneDisplay(autotune) {
         document.getElementById('positionAutotuneStatus').textContent = autotune.status;
     }
 
-    if (autotune.kp !== undefined && autotune.ki !== undefined && autotune.kd !== undefined) {
+    if (autotune.kp !== undefined) {
         document.getElementById('posKpInput').value = parseFloat(autotune.kp).toFixed(3);
-        document.getElementById('posKiInput').value = parseFloat(autotune.ki).toFixed(3);
-        document.getElementById('posKdInput').value = parseFloat(autotune.kd).toFixed(3);
+    }
+    if (autotune.kd !== undefined) {
+        const posKdInput = document.getElementById('posKdInput');
+        if (posKdInput) {
+            posKdInput.value = parseFloat(autotune.kd).toFixed(3);
+        }
     }
 
-    console.log('Position autotune update:', autotune);
+    console.log('Position tuning update:', autotune);
 }
 
 function pushVelocitySample(value) {
@@ -1050,7 +1160,10 @@ function pushVelocitySample(value) {
         return;
     }
 
-    state.velocityHistory.push(value);
+    state.velocityHistory.push({
+        t: Date.now(),
+        v: value
+    });
     if (state.velocityHistory.length > state.velocityHistoryLimit) {
         state.velocityHistory.shift();
     }
@@ -1062,11 +1175,94 @@ function pushPositionSample(value) {
         return;
     }
 
-    state.positionHistory.push(value);
+    state.positionHistory.push({
+        t: Date.now(),
+        v: value
+    });
     if (state.positionHistory.length > state.positionHistoryLimit) {
         state.positionHistory.shift();
     }
     drawTracePlot();
+}
+
+function pushTargetVelocitySample(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+
+    state.targetVelocityHistory.push({
+        t: Date.now(),
+        v: value
+    });
+    if (state.targetVelocityHistory.length > state.targetVelocityHistoryLimit) {
+        state.targetVelocityHistory.shift();
+    }
+    drawTracePlot();
+}
+
+function pushTargetPositionSample(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+
+    state.targetPositionHistory.push({
+        t: Date.now(),
+        v: value
+    });
+    if (state.targetPositionHistory.length > state.targetPositionHistoryLimit) {
+        state.targetPositionHistory.shift();
+    }
+    drawTracePlot();
+}
+
+function pushRawAngleSample(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+    state.rawAngleHistory.push({ t: Date.now(), v: value });
+    if (state.rawAngleHistory.length > state.rawAngleHistoryLimit) {
+        state.rawAngleHistory.shift();
+    }
+}
+
+function pushRawMechanicalSample(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+    state.rawMechanicalHistory.push({ t: Date.now(), v: value });
+    if (state.rawMechanicalHistory.length > state.rawMechanicalHistoryLimit) {
+        state.rawMechanicalHistory.shift();
+    }
+}
+
+function pushPreviousMechanicalSample(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+    state.previousMechanicalHistory.push({ t: Date.now(), v: value });
+    if (state.previousMechanicalHistory.length > state.previousMechanicalHistoryLimit) {
+        state.previousMechanicalHistory.shift();
+    }
+}
+
+function pushMechanicalDeltaSample(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+    state.mechanicalDeltaHistory.push({ t: Date.now(), v: value });
+    if (state.mechanicalDeltaHistory.length > state.mechanicalDeltaHistoryLimit) {
+        state.mechanicalDeltaHistory.shift();
+    }
+}
+
+function pushPreviousMultiTurnSample(value) {
+    if (!Number.isFinite(value)) {
+        return;
+    }
+    state.previousMultiTurnHistory.push({ t: Date.now(), v: value });
+    if (state.previousMultiTurnHistory.length > state.previousMultiTurnHistoryLimit) {
+        state.previousMultiTurnHistory.shift();
+    }
 }
 
 function setTraceMode() {
@@ -1090,11 +1286,14 @@ function drawTracePlot() {
     const paddingY = 16;
     const innerWidth = width - (paddingX * 2);
     const innerHeight = height - (paddingY * 2);
-    const history = state.traceMode === 'position' ? state.positionHistory : state.velocityHistory;
+    const measuredHistory = state.traceMode === 'position' ? state.positionHistory : state.velocityHistory;
+    const targetHistory = state.traceMode === 'position' ? state.targetPositionHistory : state.targetVelocityHistory;
+    const historyLimit = state.traceMode === 'position' ? state.positionHistoryLimit : state.velocityHistoryLimit;
+    const values = [...measuredHistory, ...targetHistory].map(sample => (typeof sample === 'number' ? sample : sample.v));
     const isPositionTrace = state.traceMode === 'position';
-    const minValue = history.length > 0 ? Math.min(...history) : (isPositionTrace ? 0.0 : -0.5);
-    const maxValue = history.length > 0 ? Math.max(...history) : (isPositionTrace ? 1.0 : 0.5);
-    const centeredRange = history.length > 0 ? Math.max(0.5, ...history.map(sample => Math.abs(sample))) : 0.5;
+    const minValue = values.length > 0 ? Math.min(...values) : (isPositionTrace ? 0.0 : -0.5);
+    const maxValue = values.length > 0 ? Math.max(...values) : (isPositionTrace ? 1.0 : 0.5);
+    const centeredRange = values.length > 0 ? Math.max(0.5, ...values.map(sample => Math.abs(sample))) : 0.5;
     const rangeMin = isPositionTrace ? Math.min(minValue, maxValue - 0.5) : -centeredRange;
     const rangeMax = isPositionTrace ? Math.max(maxValue, minValue + 0.5) : centeredRange;
     const rangeSpan = Math.max(0.5, rangeMax - rangeMin);
@@ -1126,10 +1325,14 @@ function drawTracePlot() {
         ctx.stroke();
     }
 
-    if (history.length > 1) {
+    const drawSeries = (history, startColor, endColor, dotColor) => {
+        if (history.length <= 1) {
+            return;
+        }
+
         const gradient = ctx.createLinearGradient(0, 0, width, 0);
-        gradient.addColorStop(0, '#14b8a6');
-        gradient.addColorStop(1, '#2563eb');
+        gradient.addColorStop(0, startColor);
+        gradient.addColorStop(1, endColor);
 
         ctx.strokeStyle = gradient;
         ctx.lineWidth = 3;
@@ -1138,8 +1341,9 @@ function drawTracePlot() {
         ctx.beginPath();
 
         history.forEach((sample, index) => {
-            const x = paddingX + (innerWidth * index / (state.velocityHistoryLimit - 1));
-            const y = mapValueToY(sample);
+            const sampleValue = (typeof sample === 'number' ? sample : sample.v);
+            const x = paddingX + (innerWidth * index / (historyLimit - 1));
+            const y = mapValueToY(sampleValue);
             if (index === 0) {
                 ctx.moveTo(x, y);
             } else {
@@ -1148,13 +1352,21 @@ function drawTracePlot() {
         });
         ctx.stroke();
 
-        const lastValue = history[history.length - 1];
-        const lastX = paddingX + (innerWidth * (history.length - 1) / (state.velocityHistoryLimit - 1));
+        const lastSample = history[history.length - 1];
+        const lastValue = (typeof lastSample === 'number' ? lastSample : lastSample.v);
+        const lastX = paddingX + (innerWidth * (history.length - 1) / (historyLimit - 1));
         const lastY = mapValueToY(lastValue);
-        ctx.fillStyle = '#0f766e';
+        ctx.fillStyle = dotColor;
         ctx.beginPath();
         ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
         ctx.fill();
+    };
+
+    if (targetHistory.length > 1) {
+        drawSeries(targetHistory, 'rgba(239, 68, 68, 0.85)', 'rgba(249, 115, 22, 0.85)', '#b91c1c');
+    }
+    if (measuredHistory.length > 1) {
+        drawSeries(measuredHistory, '#14b8a6', '#2563eb', '#0f766e');
     }
 
     ctx.fillStyle = 'rgba(82, 98, 119, 0.92)';
@@ -1170,12 +1382,100 @@ function drawTracePlot() {
 
     ctx.restore();
     if (isPositionTrace) {
-        meta.textContent = `Window: ${history.length} samples | Range: ${rangeMin.toFixed(2)} to ${rangeMax.toFixed(2)} rad`;
-        note.textContent = 'Rolling trace of measured multi-turn position from FOC telemetry.';
+        meta.textContent = `Window: ${measuredHistory.length}/${targetHistory.length} samples | Range: ${rangeMin.toFixed(2)} to ${rangeMax.toFixed(2)} rad`;
+        note.textContent = 'Measured position is teal/blue, target position is red/orange.';
     } else {
-        meta.textContent = `Window: ${history.length} samples | Scale: ±${centeredRange.toFixed(2)} rad/s`;
-        note.textContent = 'Rolling trace of measured velocity from FOC telemetry.';
+        meta.textContent = `Window: ${measuredHistory.length}/${targetHistory.length} samples | Scale: ±${centeredRange.toFixed(2)} rad/s`;
+        note.textContent = 'Measured velocity is teal/blue, commanded velocity is red/orange.';
     }
+}
+
+function exportTraceData() {
+    const readNumber = (id) => {
+        const element = document.getElementById(id);
+        return element ? parseFloat(element.value) : null;
+    };
+
+    const payload = {
+        exported_at: new Date().toISOString(),
+        connection: state.isConnected ? 'connected' : 'disconnected',
+        poll_interval_ms: state.telemetryPollIntervalMs,
+        trace_mode: state.traceMode,
+        tuning: {
+            position_gain: readNumber('posKpInput'),
+            velocity_damping: readNumber('posKdInput'),
+            velocity_ramp_limit: readNumber('velocityRampInput'),
+            position_velocity_limit: readNumber('positionVelocityLimitInput'),
+            position_accel_limit: readNumber('positionAccelLimitInput'),
+            position_decel_limit: readNumber('positionDecelLimitInput')
+        },
+        debug_console: {
+            line_count: state.debugConsoleLines.length,
+            lines: state.debugConsoleLines.map((entry, index) => ({
+                index,
+                type: entry.type,
+                line: entry.line
+            }))
+        },
+        traces: {
+            velocity: state.velocityHistory.map((sample, index) => ({
+                index,
+                timestamp_ms: typeof sample === 'number' ? null : sample.t,
+                value: typeof sample === 'number' ? sample : sample.v
+            })),
+            target_velocity: state.targetVelocityHistory.map((sample, index) => ({
+                index,
+                timestamp_ms: typeof sample === 'number' ? null : sample.t,
+                value: typeof sample === 'number' ? sample : sample.v
+            })),
+            position: state.positionHistory.map((sample, index) => ({
+                index,
+                timestamp_ms: typeof sample === 'number' ? null : sample.t,
+                value: typeof sample === 'number' ? sample : sample.v
+            })),
+            target_position: state.targetPositionHistory.map((sample, index) => ({
+                index,
+                timestamp_ms: typeof sample === 'number' ? null : sample.t,
+                value: typeof sample === 'number' ? sample : sample.v
+            })),
+            raw_angle: state.rawAngleHistory.map((sample, index) => ({
+                index,
+                timestamp_ms: typeof sample === 'number' ? null : sample.t,
+                value: typeof sample === 'number' ? sample : sample.v
+            })),
+            raw_mechanical_angle: state.rawMechanicalHistory.map((sample, index) => ({
+                index,
+                timestamp_ms: typeof sample === 'number' ? null : sample.t,
+                value: typeof sample === 'number' ? sample : sample.v
+            })),
+            previous_mechanical_angle: state.previousMechanicalHistory.map((sample, index) => ({
+                index,
+                timestamp_ms: typeof sample === 'number' ? null : sample.t,
+                value: typeof sample === 'number' ? sample : sample.v
+            })),
+            mechanical_delta: state.mechanicalDeltaHistory.map((sample, index) => ({
+                index,
+                timestamp_ms: typeof sample === 'number' ? null : sample.t,
+                value: typeof sample === 'number' ? sample : sample.v
+            })),
+            previous_multi_turn_angle: state.previousMultiTurnHistory.map((sample, index) => ({
+                index,
+                timestamp_ms: typeof sample === 'number' ? null : sample.t,
+                value: typeof sample === 'number' ? sample : sample.v
+            }))
+        }
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    link.href = url;
+    link.download = `foc-trace-${stamp}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
 }
 
 /**
@@ -1204,15 +1504,14 @@ async function getPID() {
 
 async function setPositionPID() {
     const kp = parseFloat(document.getElementById('posKpInput').value);
-    const ki = parseFloat(document.getElementById('posKiInput').value);
     const kd = parseFloat(document.getElementById('posKdInput').value);
 
-    if (isNaN(kp) || isNaN(ki) || isNaN(kd) || kp < 0 || kp > 20 || ki < 0 || ki > 10 || kd < 0 || kd > 5) {
-        alert('Please enter valid position PID values within safe ranges');
+    if (isNaN(kp) || kp < 0 || kp > 20 || isNaN(kd) || kd < 0 || kd > 5) {
+        alert('Please enter valid position gain and damping values within the safe range');
         return;
     }
 
-    await sendCommand(`SET_POSITION_PID:${kp.toFixed(3)},${ki.toFixed(3)},${kd.toFixed(3)}`);
+    await sendCommand(`SET_POSITION_PID:${kp.toFixed(3)},0.000,${kd.toFixed(3)}`);
 }
 
 async function getPositionPID() {
@@ -1314,6 +1613,8 @@ async function setMotionProfile() {
     await sendCommand(`SET_POSITION_VELOCITY_LIMIT:${positionVelocityLimit.toFixed(2)}`);
     await sendCommand(`SET_POSITION_ACCEL_LIMIT:${positionAccelLimit.toFixed(2)}`);
     await sendCommand(`SET_POSITION_DECEL_LIMIT:${positionDecelLimit.toFixed(2)}`);
+    await delay(120);
+    await getMotionProfile();
 }
 
 async function getMotionProfile() {
@@ -1356,10 +1657,22 @@ async function disconnectSerialPort() {
         state.telemetryPollCount = 0;
         state.lastDiagCallbackCount = null;
         state.lastDiagCallbackTimestamp = 0;
+        state.velocityHistory = [];
+        state.positionHistory = [];
+        state.targetVelocityHistory = [];
+        state.targetPositionHistory = [];
+        state.rawAngleHistory = [];
+        state.rawMechanicalHistory = [];
+        state.previousMechanicalHistory = [];
+        state.mechanicalDeltaHistory = [];
+        state.previousMultiTurnHistory = [];
         updateConnectionStatus(false);
+        drawTracePlot();
         console.log('Disconnected from serial port');
+        appendDebugConsole('SYS Disconnected from serial port', 'sys');
     } catch (error) {
         console.error('Disconnect error:', error);
+        appendDebugConsole(`ERR Disconnect failed: ${error}`, 'err');
     }
 }
 
@@ -1379,6 +1692,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     syncVelocityControls(parseFloat(document.getElementById('velocityInput')?.value || '1.0'));
     syncPositionControls(parseFloat(document.getElementById('positionInput')?.value || '0.0'));
+    ['velocityRampInput', 'positionVelocityLimitInput', 'positionAccelLimitInput', 'positionDecelLimitInput'].forEach((id) => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('change', () => markDirty(input));
+            input.addEventListener('blur', () => markDirty(input));
+        }
+    });
     refreshTelemetryPollingUI();
     drawTracePlot();
 

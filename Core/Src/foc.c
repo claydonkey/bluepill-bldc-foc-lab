@@ -20,7 +20,11 @@ extern TIM_HandleTypeDef htim1;
 #define FOC_DEFAULT_POSITION_ACCEL_LIMIT 100.0f
 #define FOC_DEFAULT_POSITION_DECEL_LIMIT 100.0f
 #define FOC_DEFAULT_POSITION_TORQUE_ASSIST 0.0f
-#define FOC_POSITION_ERROR_DEADBAND_RAD 0.03f
+#define FOC_POSITION_ERROR_DEADBAND_RAD 0.02f
+#define FOC_POSITION_BRAKE_MARGIN 0.78f
+#define FOC_POSITION_CRUISE_FRACTION 0.90f
+#define FOC_POSITION_CAPTURE_ZONE_MIN_RAD 1.0f
+#define FOC_POSITION_CAPTURE_ZONE_FRACTION 0.15f
 
 ControlMode_t control_mode = MODE_VELOCITY;
 ModulationMode_t modulation_mode = MODULATION_SINE;
@@ -41,6 +45,9 @@ static float pwm_period = 0.0f;
 
 static float prev_mech_angle = 0.0f;
 static float multi_turn_mech_angle = 0.0f;
+static float last_mech_delta = 0.0f;
+static float telemetry_prev_mech_angle = 0.0f;
+static float telemetry_prev_multi_turn_mech_angle = 0.0f;
 static float velocity = 0.0f;
 static float ramped_velocity_target = 0.0f;
 static float last_velocity_error = 0.0f;
@@ -98,6 +105,8 @@ void FOC_GetTelemetry(FOC_Telemetry_t *telemetry)
     extern volatile uint32_t AS5600_dma_callbacks;
     extern volatile uint32_t AS5600_dma_errors;
     extern volatile uint32_t AS5600_dma_starts;
+    extern volatile float AS5600_prev_mech_angle_dbg;
+    extern volatile float AS5600_wrapped_delta_dbg;
 
     if (telemetry == NULL)
     {
@@ -123,6 +132,10 @@ void FOC_GetTelemetry(FOC_Telemetry_t *telemetry)
     telemetry->messages_sent = foc_messages_sent;
     telemetry->messages_failed = foc_messages_failed;
     telemetry->raw_angle = AS5600_raw_angle;
+    telemetry->raw_mechanical_angle = AS5600_mech_angle;
+    telemetry->previous_mechanical_angle = AS5600_prev_mech_angle_dbg;
+    telemetry->mechanical_delta = AS5600_wrapped_delta_dbg;
+    telemetry->previous_multi_turn_angle = telemetry_prev_multi_turn_mech_angle;
     telemetry->pwm1 = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_1);
     telemetry->pwm2 = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_2);
     telemetry->pwm3 = __HAL_TIM_GET_COMPARE(&htim1, TIM_CHANNEL_3);
@@ -824,7 +837,10 @@ void FOC_Loop(void)
     }
 
     {
+        telemetry_prev_mech_angle = prev_mech_angle;
+        telemetry_prev_multi_turn_mech_angle = multi_turn_mech_angle;
         float mech_delta = sensor_direction * wrapped_angle_delta(mech, prev_mech_angle);
+        last_mech_delta = mech_delta;
         multi_turn_mech_angle += mech_delta;
     }
 
@@ -901,19 +917,51 @@ void FOC_Loop(void)
     }
     else
     {
-        float pos_err = target_position - multi_turn_mech_angle;
+        float pos_err;
         float vel_err;
-        float pos_velocity_target = (pos_pid.kp * pos_err) - (pos_pid.kd * velocity);
-        float abs_pos_err = fabsf(pos_err);
-        float velocity_step_limit;
+        float abs_pos_err;
+        float stop_velocity_limit;
+        float capture_zone_rad;
         float velocity_target;
+        float pos_velocity_target;
+        float velocity_step_limit;
+        float damping_term;
+
+        pos_err = target_position - multi_turn_mech_angle;
+        abs_pos_err = fabsf(pos_err);
 
         if (abs_pos_err <= FOC_POSITION_ERROR_DEADBAND_RAD)
         {
             pos_velocity_target = 0.0f;
         }
+        else
+        {
+            stop_velocity_limit = FOC_POSITION_BRAKE_MARGIN *
+                                  sqrtf(fmaxf(0.0f, 2.0f * position_decel_limit * abs_pos_err));
+            capture_zone_rad = fmaxf(FOC_POSITION_CAPTURE_ZONE_MIN_RAD,
+                                     position_velocity_limit * FOC_POSITION_CAPTURE_ZONE_FRACTION);
+            damping_term = pos_pid.kd * velocity;
 
-        pos_velocity_target = clampf(pos_velocity_target, -position_velocity_limit, position_velocity_limit);
+            if (abs_pos_err > capture_zone_rad)
+            {
+                // Cruise briskly while far away, but with a conservative
+                // ceiling so braking starts earlier and overshoot is reduced.
+                pos_velocity_target = copysignf(
+                    fminf(position_velocity_limit * FOC_POSITION_CRUISE_FRACTION,
+                          stop_velocity_limit),
+                    pos_err);
+            }
+            else
+            {
+                // In the last part of the move, transition to a damped linear
+                // capture law for a softer settle.
+                pos_velocity_target = (pos_pid.kp * pos_err);
+                pos_velocity_target = clampf(pos_velocity_target, -stop_velocity_limit, stop_velocity_limit);
+            }
+
+            pos_velocity_target -= damping_term;
+            pos_velocity_target = clampf(pos_velocity_target, -position_velocity_limit, position_velocity_limit);
+        }
 
         velocity_step_limit = ((fabsf(pos_velocity_target) > fabsf(ramped_velocity_target)) ? position_accel_limit : position_decel_limit) * dt;
         ramped_velocity_target = ramp_towards(ramped_velocity_target, pos_velocity_target, velocity_step_limit);
@@ -922,7 +970,7 @@ void FOC_Loop(void)
         Uq = PID_compute(&vel_pid, vel_err, dt);
         err = vel_err;
 
-        if (abs_pos_err <= FOC_POSITION_ERROR_DEADBAND_RAD && fabsf(velocity) < 0.30f && fabsf(velocity_target) < 0.10f)
+        if (abs_pos_err <= FOC_POSITION_ERROR_DEADBAND_RAD && fabsf(velocity) < 0.20f && fabsf(velocity_target) < 0.05f)
         {
             FOC_ResetPID();
             ramped_velocity_target = 0.0f;

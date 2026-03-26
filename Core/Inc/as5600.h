@@ -25,5 +25,8 @@ extern volatile uint32_t AS5600_dma_starts;
 extern volatile float AS5600_mech_angle;
 extern volatile float AS5600_velocity;
 extern volatile uint32_t AS5600_last_update_ms;
+extern volatile uint16_t AS5600_prev_raw_angle;
+extern volatile float AS5600_prev_mech_angle_dbg;
+extern volatile float AS5600_wrapped_delta_dbg;
 
 #endif /* INC_AS5600_H_ */

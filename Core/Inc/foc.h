@@ -36,6 +36,10 @@ typedef struct {
     uint32_t messages_sent;
     uint32_t messages_failed;
     uint16_t raw_angle;
+    float raw_mechanical_angle;
+    float previous_mechanical_angle;
+    float mechanical_delta;
+    float previous_multi_turn_angle;
     uint32_t pwm1;
     uint32_t pwm2;
     uint32_t pwm3;

@@ -23,6 +23,9 @@ volatile uint32_t AS5600_dma_starts = 0;    // Track how many times DMA was star
 volatile float AS5600_mech_angle = 0.0f;
 volatile float AS5600_velocity = 0.0f;
 volatile uint32_t AS5600_last_update_ms = 0;
+volatile uint16_t AS5600_prev_raw_angle = 0;
+volatile float AS5600_prev_mech_angle_dbg = 0.0f;
+volatile float AS5600_wrapped_delta_dbg = 0.0f;
 
 static volatile uint8_t as5600_dma_inflight = 0;
 static volatile uint8_t as5600_sample_ready = 0;
@@ -85,11 +88,16 @@ static void AS5600_ProcessPendingSample(void) {
     }
 
     as5600_sample_ready = 0U;
+    AS5600_prev_raw_angle = AS5600_raw_angle;
     AS5600_raw_angle = as5600_pending_raw_angle;
     AS5600_dma_callbacks++;
     as5600_consecutive_error_callbacks = 0U;
 
     float new_mech = (float)AS5600_raw_angle * AS5600_LSB_RAD;
+    AS5600_prev_mech_angle_dbg = AS5600_mech_angle;
+    AS5600_wrapped_delta_dbg = new_mech - AS5600_prev_mech_angle_dbg;
+    if (AS5600_wrapped_delta_dbg > M_PI) AS5600_wrapped_delta_dbg -= 2.0f * M_PI;
+    if (AS5600_wrapped_delta_dbg < -M_PI) AS5600_wrapped_delta_dbg += 2.0f * M_PI;
     uint32_t now_ms = HAL_GetTick();
 
     if (AS5600_last_update_ms > 0U) {
@@ -157,8 +165,9 @@ void HAL_I2C_MemRxCpltCallback(I2C_HandleTypeDef *hi2c) {
         as5600_pending_raw_angle = ((uint16_t)AS5600_dma_buf[0] << 8) |
                                    AS5600_dma_buf[1];
         as5600_pending_raw_angle &= 0x0FFF;
-        AS5600_raw_angle = as5600_pending_raw_angle;
-        AS5600_mech_angle = (float)AS5600_raw_angle * AS5600_LSB_RAD;
+        // Keep the current raw/mechanical state untouched until the main-loop
+        // sample processor consumes this reading, so previous-angle and delta
+        // debug values reflect the real transition between samples.
         as5600_sample_ready = 1U;
         as5600_dma_inflight = 0U;
     }

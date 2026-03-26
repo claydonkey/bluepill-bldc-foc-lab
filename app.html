@@ -1,10 +1,14 @@
 <!DOCTYPE html>
+<!--
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 Anthony Campbell (claydonkey)
+-->
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Motor Control Dashboard</title>
+    <title>Bluepill BLDC FOC Lab</title>
     <style>
         * {
             margin: 0;
@@ -167,6 +171,43 @@
             border-radius: 24px;
             padding: 22px;
             box-shadow: var(--shadow-soft);
+        }
+
+        .app-footer {
+            margin-top: 28px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(148, 163, 184, 0.24);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 18px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 0.84rem;
+            line-height: 1.6;
+        }
+
+        .footer-copy {
+            max-width: 60ch;
+        }
+
+        .footer-meta {
+            display: flex;
+            gap: 10px 14px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .footer-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: var(--text);
+            font-weight: 600;
+            letter-spacing: 0.01em;
         }
 
         .collapsible {
@@ -619,6 +660,49 @@
             border-radius: 12px;
         }
 
+        .debug-console {
+            display: grid;
+            gap: 12px;
+        }
+
+        .debug-console-frame {
+            background: #0f172a;
+            color: #dbeafe;
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            border-radius: 16px;
+            padding: 12px;
+            min-height: 220px;
+            max-height: 320px;
+            overflow: auto;
+            font: 12px/1.45 Consolas, "Courier New", monospace;
+        }
+
+        .debug-console-line {
+            margin: 0 0 6px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .debug-console-line:last-child {
+            margin-bottom: 0;
+        }
+
+        .debug-console-rx {
+            color: #93c5fd;
+        }
+
+        .debug-console-tx {
+            color: #86efac;
+        }
+
+        .debug-console-sys {
+            color: #fcd34d;
+        }
+
+        .debug-console-err {
+            color: #fca5a5;
+        }
+
 
         .toolbar-slot {
             position: absolute;
@@ -699,12 +783,12 @@
         <div class="toolbar-slot" id="toolbarSlot"></div>
         <div class="hero">
             <div class="hero-copy">
-                <div class="eyebrow">Motor Control Console</div>
+                <div class="eyebrow">Bluepill FOC Console</div>
                 <h1>
-                    Motor Control Dashboard
+                    Bluepill BLDC FOC Lab
                     <span class="connection-status disconnected" id="connectionStatus"></span>
                 </h1>
-                <p>Drive the Blue Pill controller, compare measured behavior with commanded behavior, and jump quickly
+                <p>Drive the Bluepill controller, compare measured behavior with commanded behavior, and jump quickly
                     between closed-loop, open-loop, vector, and phase-map tests.</p>
             </div>
             <div class="hero-status">
@@ -822,6 +906,7 @@
                                 <option value="velocity" selected>Velocity Trace</option>
                                 <option value="position">Position Trace</option>
                             </select>
+                            <button class="btn-secondary" onclick="exportTraceData()">Export Trace + Console</button>
                         </div>
                         <div class="plot-frame">
                             <canvas id="tracePlot" class="plot-canvas" width="640" height="220"></canvas>
@@ -829,6 +914,23 @@
                         <div class="subtle-note" id="tracePlotNote">
                             Rolling trace of measured velocity from FOC telemetry.
                         </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">
+                        <h2>Debug Console</h2>
+                    </div>
+                    <div class="debug-console">
+                        <div class="plot-meta">
+                            <span class="plot-badge">
+                                <span class="plot-badge-dot"></span>
+                                <span>Raw serial log</span>
+                            </span>
+                            <button class="btn-secondary" onclick="exportTraceData()">Export Trace + Console</button>
+                            <button class="btn-secondary" onclick="clearDebugConsole()">Clear Console</button>
+                        </div>
+                        <div class="debug-console-frame" id="debugConsole"></div>
                     </div>
                 </div>
 
@@ -939,34 +1041,29 @@
                         <button class="btn-warm" onclick="startAutotune()">Start Autotune</button>
                         <button class="btn-outline" onclick="applyAutotuneResults()">Apply Suggested</button>
                     </div>
-                    <div class="stack-label" style="margin-top: 16px;">Position Loop</div>
+                    <div class="stack-label" style="margin-top: 16px;">Position Servo</div>
                     <div class="debug-item" style="margin-bottom: 14px;">
-                        <span class="debug-label">Position Autotune:</span>
+                        <span class="debug-label">Position Servo Tune:</span>
                         <span class="debug-value" id="positionAutotuneStatus">Idle</span>
                     </div>
-                    <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(3, minmax(0, 1fr));">
+                    <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
                         <div>
-                            <input type="number" id="posKpInput" placeholder="Pos Kp" step="0.1" min="0" max="50" value="1.2"
+                            <input type="number" id="posKpInput" placeholder="Position Gain" step="0.1" min="0" max="50" value="1.2"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Position Kp</div>
+                            <div class="subtle-note" style="margin-top: 6px;">Position-to-velocity gain</div>
                         </div>
                         <div>
-                            <input type="number" id="posKiInput" placeholder="Pos Ki" step="0.01" min="0" max="10" value="0.0"
+                            <input type="number" id="posKdInput" placeholder="Velocity Damping" step="0.01" min="0" max="5" value="0.04"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Position Ki</div>
-                        </div>
-                        <div>
-                            <input type="number" id="posKdInput" placeholder="Pos Kd" step="0.01" min="0" max="5" value="0.04"
-                                style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Position Kd</div>
+                            <div class="subtle-note" style="margin-top: 6px;">Measured-velocity damping term</div>
                         </div>
                     </div>
                     <div class="button-group" style="margin-bottom: 0;">
-                        <button class="btn-primary" onclick="setPositionPID()">Set Position PID</button>
-                        <button class="btn-secondary" onclick="getPositionPID()">Get Position PID</button>
+                        <button class="btn-primary" onclick="setPositionPID()">Set Position Gain</button>
+                        <button class="btn-secondary" onclick="getPositionPID()">Read Position Gain</button>
                     </div>
                     <div class="button-group" style="margin-top: 12px; margin-bottom: 0;">
-                        <button class="btn-warm" onclick="startPositionAutotune()">Start Position Autotune</button>
+                        <button class="btn-warm" onclick="startPositionAutotune()">Start Position Tune</button>
                         <div></div>
                     </div>
                 </div>
@@ -981,28 +1078,28 @@
                                 max="200" value="100.0"
                                 oninput="markDirty(this)"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Velocity ramp limit (rad/s²)</div>
+                            <div class="subtle-note" style="margin-top: 6px;">Velocity-mode acceleration limit (rad/s²)</div>
                         </div>
                         <div>
                             <input type="number" id="positionVelocityLimitInput" placeholder="Position Velocity Limit"
                                 step="0.5" min="0.2" max="100" value="40.0"
                                 oninput="markDirty(this)"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Max inner speed in position mode (rad/s)</div>
+                            <div class="subtle-note" style="margin-top: 6px;">Planned max speed in position moves (rad/s)</div>
                         </div>
                         <div>
                             <input type="number" id="positionAccelLimitInput" placeholder="Position Accel Limit"
                                 step="0.5" min="0.1" max="400" value="80.0"
                                 oninput="markDirty(this)"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Position accel limit (rad/s²)</div>
+                            <div class="subtle-note" style="margin-top: 6px;">Profile acceleration limit (rad/s²)</div>
                         </div>
                         <div>
                             <input type="number" id="positionDecelLimitInput" placeholder="Position Decel Limit"
                                 step="0.5" min="0.1" max="400" value="90.0"
                                 oninput="markDirty(this)"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                            <div class="subtle-note" style="margin-top: 6px;">Position decel limit (rad/s²)</div>
+                            <div class="subtle-note" style="margin-top: 6px;">Profile deceleration limit (rad/s²)</div>
                         </div>
                         <div style="display: flex; justify-content: center; padding-top: 2px;">
                             <button class="btn-primary" onclick="setMotionProfile()">Set</button>
@@ -1170,6 +1267,18 @@
                 </div>
             </div>
         </div>
+
+        <footer class="app-footer">
+            <div class="footer-copy">
+                Browser dashboard for the Bluepill BLDC FOC Lab project. Built for STM32F103 Bluepill hardware with
+                USB CDC control, live telemetry, tuning, diagnostics, and trace export.
+            </div>
+            <div class="footer-meta">
+                <span class="footer-chip">STM32F103 Bluepill</span>
+                <span class="footer-chip">Anthony Campbell (claydonkey)</span>
+                <span class="footer-chip">MIT Licensed</span>
+            </div>
+        </footer>
     </div>
 
     <script src="app.js"></script>
