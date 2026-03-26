@@ -63,6 +63,12 @@ volatile uint8_t uart_rx_ready = 0;
 static uint8_t uart2_rx_byte = 0;
 static char uart_line_buffer[UART_RX_BUFFER_SIZE];
 static uint32_t uart_line_len = 0;
+static uint8_t command_usb_tx_buffer[512];
+static char usb_ready_msg[] = "{\"status\":\"ready\"}\r\n";
+static char foc_telemetry_tx_buffer[448];
+static char foc_diag_tx_buffer[192];
+static FOC_Telemetry_t foc_telemetry_cache = { 0 };
+static uint32_t foc_telemetry_cache_ms = 0;
 
 typedef enum
 {
@@ -125,6 +131,9 @@ static void position_autotune_send_status(const char *status);
 static void position_autotune_finish(void);
 static void position_autotune_service(void);
 static void position_autotune_start(void);
+static void send_foc_telemetry_snapshot(void);
+static void send_diag_snapshot(void);
+static float json_safe_float(float value);
 
 typedef struct
 {
@@ -172,24 +181,58 @@ uint8_t Command_Transmit(uint8_t *Buf, uint16_t Len)
 		return USBD_FAIL;
 	}
 
+#if HC05_ENABLED
 	if (active_command_transport == COMMAND_TRANSPORT_UART)
 	{
 		return (USART2_Transmit_Blocking(Buf, Len, 100U) == 0U) ? USBD_OK : USBD_FAIL;
 	}
+#endif
 
-	return USB_CDC_Transmit_FS(Buf, Len);
+	if (Len > sizeof(command_usb_tx_buffer))
+	{
+		return USBD_FAIL;
+	}
+
+	memcpy(command_usb_tx_buffer, Buf, Len);
+	for (uint32_t start = HAL_GetTick(); (HAL_GetTick() - start) < 25U;)
+	{
+		if (USB_CDC_Transmit_FS(command_usb_tx_buffer, Len) == USBD_OK)
+		{
+			return USBD_OK;
+		}
+		HAL_Delay(1);
+	}
+
+	return USBD_BUSY;
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM2)
 	{
-
 		foc_flag = 1;
-		//	FOC_Loop();  // Don't call from ISR - breaks CDC
+		// FOC_Loop runs in the main loop to keep ISR work short and avoid
+		// destabilizing the rest of the firmware.
 	}
 }
 
+void enter_dfu_mode(void)
+{
+	// Write the magic value to the last 8 bytes of RAM
+	volatile uint64_t *magic = (uint64_t *)(0x20004FF8);
+	*magic = 0xDEADBEEFCC00FFEEULL;
+
+	// Trigger a system reset
+	NVIC_SystemReset();
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+ if (GPIO_Pin == DFU_EXTI2_Pin)
+	{
+		enter_dfu_mode();
+	}
+}
 void HC05_OnByteReceived(uint8_t ch)
 {
 	if ((ch == '\r') || (ch == '\n'))
@@ -215,21 +258,29 @@ void HC05_OnByteReceived(uint8_t ch)
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
+#if HC05_ENABLED
 	if (huart->Instance == USART2)
 	{
 		HC05_OnByteReceived(uart2_rx_byte);
 		HAL_UART_Receive_IT(&huart2, &uart2_rx_byte, 1U);
 	}
+#else
+	(void) huart;
+#endif
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
 {
+#if HC05_ENABLED
 	if (huart->Instance == USART2)
 	{
 		__HAL_UART_CLEAR_OREFLAG(huart);
 		uart_line_len = 0U;
 		HAL_UART_Receive_IT(&huart2, &uart2_rx_byte, 1U);
 	}
+#else
+	(void) huart;
+#endif
 }
 
 void start_motor()
@@ -554,6 +605,80 @@ static void autotune_start(void)
 	FOC_StartTorque(0.0f);
 	autotune_send_status("settle");
 }
+
+static float json_safe_float(float value)
+{
+	return isfinite(value) ? value : 0.0f;
+}
+
+static int32_t telemetry_scale_100(float value)
+{
+	value = json_safe_float(value);
+	if (value > 21474836.0f)
+	{
+		value = 21474836.0f;
+	}
+	else if (value < -21474836.0f)
+	{
+		value = -21474836.0f;
+	}
+	return (int32_t) lrintf(value * 100.0f);
+}
+
+static int32_t telemetry_scale_1000(float value)
+{
+	value = json_safe_float(value);
+	if (value > 2147483.0f)
+	{
+		value = 2147483.0f;
+	}
+	else if (value < -2147483.0f)
+	{
+		value = -2147483.0f;
+	}
+	return (int32_t) lrintf(value * 1000.0f);
+}
+
+static void send_foc_telemetry_snapshot(void)
+{
+	int len = snprintf(foc_telemetry_tx_buffer, sizeof(foc_telemetry_tx_buffer),
+			"{\"foc\":{\"vi\":%ld,\"mechi\":%ld,\"ti\":%ld,\"tri\":%ld,\"tpi\":%ld,\"erri\":%ld,\"uqi\":%ld,\"vlimi\":%ld,\"vrampi\":%ld,\"pvlimi\":%ld,\"pacci\":%ld,\"pdeci\":%ld,\"pboosti\":%ld,\"usat\":%u,\"mode\":%u,\"mod\":%u,\"pm\":%u,\"adiri\":%ld,\"aligni\":%ld,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.velocity)),
+			(long) telemetry_scale_1000(json_safe_float(foc_telemetry_cache.mechanical_angle)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.target_velocity)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.ramped_velocity_target)),
+			(long) telemetry_scale_1000(json_safe_float(foc_telemetry_cache.target_position)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.velocity_error)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.uq_voltage)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.voltage_limit)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.velocity_ramp_rate)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.position_velocity_limit)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.position_accel_limit)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.position_decel_limit)),
+			(long) telemetry_scale_100(json_safe_float(foc_telemetry_cache.position_torque_assist)), foc_telemetry_cache.uq_saturated, foc_telemetry_cache.control_mode,
+			foc_telemetry_cache.modulation_mode, foc_telemetry_cache.phase_map,
+			(long) telemetry_scale_1000(json_safe_float(foc_telemetry_cache.sensor_direction)),
+			(long) telemetry_scale_1000(json_safe_float(foc_telemetry_cache.alignment_offset)), foc_telemetry_cache.loop_count, foc_telemetry_cache.raw_angle,
+			foc_telemetry_cache.pwm1, foc_telemetry_cache.pwm2, foc_telemetry_cache.pwm3, foc_telemetry_cache.pwm_period, foc_telemetry_cache.dma_callbacks, foc_telemetry_cache.dma_errors, foc_telemetry_cache.dma_starts,
+			foc_telemetry_cache.motor_running);
+
+	if (len > 0 && len < (int) sizeof(foc_telemetry_tx_buffer))
+	{
+		CDC_Transmit_FS((uint8_t*) foc_telemetry_tx_buffer, len);
+	}
+}
+
+static void send_diag_snapshot(void)
+{
+	int diag_len = snprintf(foc_diag_tx_buffer, sizeof(foc_diag_tx_buffer), "{\"diag\":{\"lc\":%lu,\"sent\":%lu,\"failed\":%lu,\"enc\":%u,\"cb\":%lu,\"err\":%lu,\"start\":%lu,\"run\":%u}}\r\n", foc_telemetry_cache.loop_count,
+			foc_telemetry_cache.messages_sent, foc_telemetry_cache.messages_failed, foc_telemetry_cache.raw_angle, foc_telemetry_cache.dma_callbacks, foc_telemetry_cache.dma_errors, foc_telemetry_cache.dma_starts,
+			foc_telemetry_cache.motor_running);
+
+	if (diag_len > 0 && diag_len < (int) sizeof(foc_diag_tx_buffer))
+	{
+		CDC_Transmit_FS((uint8_t*) foc_diag_tx_buffer, diag_len);
+	}
+}
 /* USER CODE END 0 */
 
 /**
@@ -606,13 +731,16 @@ int main(void)
 
 	// Start FOC timer for continuous velocity measurement
 	HAL_TIM_Base_Start_IT(&htim2);
+#if HC05_ENABLED
 	HAL_UART_Receive_IT(&huart2, &uart2_rx_byte, 1U);
+#endif
 
 	control_mode = MODE_VELOCITY;
 	target_velocity = 0.0f; // Start with zero velocity - wait for START command
 
-	// Send startup confirmation
-	CDC_Transmit_FS((uint8_t*) "{\"status\":\"ready\"}\r\n", strlen("{\"status\":\"ready\"}\r\n"));
+	// Keep autonomous status/telemetry on USB so the web dashboard is not affected
+	// by noise or activity on the optional HC-05 link.
+	USB_CDC_Transmit_FS((uint8_t*) usb_ready_msg, (uint16_t) strlen(usb_ready_msg));
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
@@ -621,6 +749,17 @@ int main(void)
 	{
 		/* USER CODE END WHILE */
 		HAL_IWDG_Refresh(&hiwdg);
+		AS5600_Service();
+		if (foc_flag)
+		{
+			foc_flag = 0;
+			FOC_Loop();
+		}
+		if ((HAL_GetTick() - foc_telemetry_cache_ms) >= 50U)
+		{
+			FOC_GetTelemetry(&foc_telemetry_cache);
+			foc_telemetry_cache_ms = HAL_GetTick();
+		}
 		if (usb_rx_ready)
 		{
 			active_command_transport = COMMAND_TRANSPORT_USB;
@@ -632,69 +771,24 @@ int main(void)
 		}
 		if (uart_rx_ready)
 		{
+#if HC05_ENABLED
 			active_command_transport = COMMAND_TRANSPORT_UART;
 			process_usb_command((const char*) uart_rx_buffer, uart_rx_len);
 			uart_rx_ready = 0;
 			uart_rx_len = 0;
 			memset(uart_rx_buffer, 0, UART_RX_BUFFER_SIZE);
 			active_command_transport = COMMAND_TRANSPORT_USB;
-		}
-		AS5600_Service();
-		if (foc_flag)
-		{
-			foc_flag = 0;
-			FOC_Loop(); // Call from main loop, not ISR
+#else
+			uart_rx_ready = 0;
+			uart_rx_len = 0;
+			memset(uart_rx_buffer, 0, UART_RX_BUFFER_SIZE);
+#endif
 		}
 		autotune_service();
 		position_autotune_service();
-		// Send one CDC packet per slot. Back-to-back Transmit calls commonly return
-		// USBD_BUSY because the previous USB IN transfer is still in flight.
-		static uint32_t last_telemetry_time = 0;
-		static uint8_t send_diag_next = 0;
-		uint32_t current_time = HAL_GetTick();
-		if ((current_time - last_telemetry_time) >= 250)
-		{
-			FOC_Telemetry_t foc_telemetry;
-			char telemetry[448];
-			char diag[192];
-			FOC_GetTelemetry(&foc_telemetry);
-			int len =
-					snprintf(telemetry, sizeof(telemetry),
-							"{\"foc\":{\"v\":%.2f,\"mech\":%.3f,\"t\":%.2f,\"tr\":%.2f,\"tp\":%.3f,\"err\":%.2f,\"uq\":%.2f,\"vlim\":%.2f,\"vramp\":%.2f,\"pvlim\":%.2f,\"pacc\":%.2f,\"pdec\":%.2f,\"pboost\":%.2f,\"usat\":%u,\"mode\":%u,\"mod\":%u,\"pm\":%u,\"adir\":%.0f,\"align\":%.4f,\"lc\":%lu,\"r\":%u,\"pwm\":[%lu,%lu,%lu],\"per\":%lu,\"cb\":%lu,\"derr\":%lu,\"start\":%lu,\"run\":%u}}\r\n",
-							foc_telemetry.velocity, foc_telemetry.mechanical_angle, foc_telemetry.target_velocity, foc_telemetry.ramped_velocity_target, foc_telemetry.target_position,
-							foc_telemetry.velocity_error, foc_telemetry.uq_voltage, foc_telemetry.voltage_limit, foc_telemetry.velocity_ramp_rate, foc_telemetry.position_velocity_limit,
-							foc_telemetry.position_accel_limit, foc_telemetry.position_decel_limit, foc_telemetry.position_torque_assist, foc_telemetry.uq_saturated, foc_telemetry.control_mode,
-							foc_telemetry.modulation_mode, foc_telemetry.phase_map, foc_telemetry.sensor_direction, foc_telemetry.alignment_offset, foc_telemetry.loop_count, foc_telemetry.raw_angle,
-							foc_telemetry.pwm1, foc_telemetry.pwm2, foc_telemetry.pwm3, foc_telemetry.pwm_period, foc_telemetry.dma_callbacks, foc_telemetry.dma_errors, foc_telemetry.dma_starts,
-							foc_telemetry.motor_running);
-			int diag_len = snprintf(diag, sizeof(diag), "{\"diag\":{\"lc\":%lu,\"sent\":%lu,\"failed\":%lu,\"enc\":%u,\"cb\":%lu,\"err\":%lu,\"start\":%lu,\"run\":%u}}\r\n", foc_telemetry.loop_count,
-					foc_telemetry.messages_sent, foc_telemetry.messages_failed, foc_telemetry.raw_angle, foc_telemetry.dma_callbacks, foc_telemetry.dma_errors, foc_telemetry.dma_starts,
-					foc_telemetry.motor_running);
-			if (len > 0 && len < (int) sizeof(telemetry) && diag_len > 0 && diag_len < (int) sizeof(diag))
-			{
-				uint8_t result;
-				if (send_diag_next)
-				{
-					result = CDC_Transmit_FS((uint8_t*) diag, diag_len);
-				}
-				else
-				{
-					result = CDC_Transmit_FS((uint8_t*) telemetry, len);
-				}
-				if (result == USBD_OK)
-				{
-					extern volatile uint32_t foc_messages_sent;
-					foc_messages_sent++;
-					send_diag_next ^= 1U;
-				}
-				else
-				{
-					extern volatile uint32_t foc_messages_failed;
-					foc_messages_failed++;
-				}
-				last_telemetry_time = current_time;
-			}
-		}
+		// Telemetry is served on-demand via GET_TELEMETRY / GET_DIAG so the dashboard
+		// has a deterministic request/response path and does not compete with a
+		// free-running USB stream.
 		/* USER CODE BEGIN 3 */
 	}
 	/* USER CODE END 3 */
@@ -792,6 +886,14 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		{
 			CDC_Transmit_FS((uint8_t*) status_msg, status_len);
 		}
+	}
+	else if (strcmp(command, "GET_TELEMETRY") == 0)
+	{
+		send_foc_telemetry_snapshot();
+	}
+	else if (strcmp(command, "GET_DIAG") == 0)
+	{
+		send_diag_snapshot();
 	}
 	else if (strcmp(command, "START") == 0)
 	{

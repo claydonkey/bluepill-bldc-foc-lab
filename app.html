@@ -222,6 +222,25 @@
             margin-bottom: 0;
         }
 
+        .status-item-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            min-width: 220px;
+        }
+
+        .status-inline-value {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: var(--muted);
+        }
+
+        .status-inline-button {
+            min-width: 140px;
+            padding: 10px 14px;
+        }
+
         .status-label {
             font-weight: 600;
             color: var(--muted);
@@ -727,6 +746,22 @@
                         <span class="status-value" id="lastUpdate">N/A</span>
                     </div>
                     <div class="status-item">
+                        <span class="status-label">Polling</span>
+                        <div class="status-item-controls">
+                            <button class="btn-secondary status-inline-button" id="pollingToggleBtn"
+                                onclick="toggleTelemetryPolling()">Pause Polling</button>
+                            <span class="status-inline-value" id="pollingStateLabel">Live at 200 ms</span>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Polling Interval</span>
+                        <div class="status-item-controls">
+                            <input type="range" id="pollingSlider" class="range-input" min="100" max="2000" step="50"
+                                value="200" oninput="updateTelemetryPollingInterval(this.value)">
+                            <span class="status-inline-value" id="pollingIntervalValue">200 ms</span>
+                        </div>
+                    </div>
+                    <div class="status-item">
                         <span class="status-label">Alignment Offset</span>
                         <span class="status-value" id="alignmentOffset">—</span>
                     </div>
@@ -911,7 +946,7 @@
                     </div>
                     <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(3, minmax(0, 1fr));">
                         <div>
-                            <input type="number" id="posKpInput" placeholder="Pos Kp" step="0.1" min="0" max="50" value="20.0"
+                            <input type="number" id="posKpInput" placeholder="Pos Kp" step="0.1" min="0" max="50" value="1.2"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                             <div class="subtle-note" style="margin-top: 6px;">Position Kp</div>
                         </div>
@@ -921,7 +956,7 @@
                             <div class="subtle-note" style="margin-top: 6px;">Position Ki</div>
                         </div>
                         <div>
-                            <input type="number" id="posKdInput" placeholder="Pos Kd" step="0.01" min="0" max="5" value="0.0"
+                            <input type="number" id="posKdInput" placeholder="Pos Kd" step="0.01" min="0" max="5" value="0.04"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                             <div class="subtle-note" style="margin-top: 6px;">Position Kd</div>
                         </div>
@@ -943,7 +978,7 @@
                     <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: start;">
                         <div>
                             <input type="number" id="velocityRampInput" placeholder="Velocity Ramp" step="0.5" min="0.1"
-                                max="200" value="10.0"
+                                max="200" value="100.0"
                                 oninput="markDirty(this)"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                             <div class="subtle-note" style="margin-top: 6px;">Velocity ramp limit (rad/s²)</div>
@@ -957,7 +992,7 @@
                         </div>
                         <div>
                             <input type="number" id="positionAccelLimitInput" placeholder="Position Accel Limit"
-                                step="0.5" min="0.1" max="400" value="30.0"
+                                step="0.5" min="0.1" max="400" value="80.0"
                                 oninput="markDirty(this)"
                                 style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                             <div class="subtle-note" style="margin-top: 6px;">Position accel limit (rad/s²)</div>

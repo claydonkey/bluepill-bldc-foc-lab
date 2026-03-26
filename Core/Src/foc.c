@@ -15,10 +15,10 @@ extern TIM_HandleTypeDef htim1;
 #define FOC_DEFAULT_LOW_SPEED_BIAS_VOLTAGE 0.35f
 #define FOC_DEFAULT_LOW_SPEED_BIAS_FADE_SPEED 1.5f
 #define FOC_LOW_SPEED_ASSIST_DEADBAND_RAD_S 0.20f
-#define FOC_DEFAULT_VELOCITY_RAMP 10.0f
+#define FOC_DEFAULT_VELOCITY_RAMP 100.0f
 #define FOC_DEFAULT_POSITION_VELOCITY_LIMIT 40.0f
-#define FOC_DEFAULT_POSITION_ACCEL_LIMIT 30.0f
-#define FOC_DEFAULT_POSITION_DECEL_LIMIT 90.0f
+#define FOC_DEFAULT_POSITION_ACCEL_LIMIT 100.0f
+#define FOC_DEFAULT_POSITION_DECEL_LIMIT 100.0f
 #define FOC_DEFAULT_POSITION_TORQUE_ASSIST 0.0f
 #define FOC_POSITION_ERROR_DEADBAND_RAD 0.01f
 
@@ -459,9 +459,9 @@ ModulationMode_t FOC_GetModulationMode(void)
 }
 
 static PID_t pos_pid = {
-    .kp = 20.0f,
+    .kp = 1.2f,
     .ki = 0.0f,
-    .kd = 0.0f,
+    .kd = 0.04f,
     .output_limit = FOC_DEFAULT_POSITION_VELOCITY_LIMIT};
 
 static float clamp_pwm_count(float value)
@@ -860,8 +860,7 @@ void FOC_Loop(void)
             2.0f * (float)M_PI / 3.0f,
             (float)M_PI,
             4.0f * (float)M_PI / 3.0f,
-            5.0f * (float)M_PI / 3.0f
-        };
+            5.0f * (float)M_PI / 3.0f};
         Uq = vector_test_uq_voltage;
         err = 0.0f;
         theta_e = vector_angles[vector_test_index];
@@ -906,6 +905,8 @@ void FOC_Loop(void)
         float vel_err;
         float pos_velocity_target = pos_pid.kp * pos_err;
         float abs_pos_err = fabsf(pos_err);
+        float velocity_step_limit;
+        float velocity_target;
 
         if (abs_pos_err <= FOC_POSITION_ERROR_DEADBAND_RAD)
         {
@@ -914,15 +915,28 @@ void FOC_Loop(void)
 
         pos_velocity_target = clampf(pos_velocity_target, -position_velocity_limit, position_velocity_limit);
 
-        ramped_velocity_target = pos_velocity_target;
-        vel_err = pos_velocity_target - velocity;
+        velocity_step_limit = ((fabsf(pos_velocity_target) > fabsf(ramped_velocity_target)) ? position_accel_limit : position_decel_limit) * dt;
+        ramped_velocity_target = ramp_towards(ramped_velocity_target, pos_velocity_target, velocity_step_limit);
+        velocity_target = ramped_velocity_target;
+        vel_err = velocity_target - velocity;
         Uq = PID_compute(&vel_pid, vel_err, dt);
         if (abs_pos_err > (FOC_POSITION_ERROR_DEADBAND_RAD * 2.0f))
         {
-            Uq += compute_low_speed_feedforward(pos_velocity_target);
-            Uq += compute_low_speed_torque_bias(pos_velocity_target, vel_err);
+            Uq += compute_low_speed_feedforward(velocity_target);
+            Uq += compute_low_speed_torque_bias(velocity_target, vel_err);
         }
         err = vel_err;
+
+        if (abs_pos_err <= FOC_POSITION_ERROR_DEADBAND_RAD && fabsf(velocity) < 0.15f && fabsf(velocity_target) < 0.05f)
+        {
+            FOC_ResetPID();
+            ramped_velocity_target = 0.0f;
+            velocity_target = 0.0f;
+            vel_err = 0.0f;
+            err = 0.0f;
+            Uq = 0.0f;
+        }
+
         if (Uq > uq_voltage_limit)
         {
             Uq = uq_voltage_limit;

@@ -16,6 +16,16 @@ const state = {
     reader: null,
     isConnected: false,
     inputBuffer: '',
+    telemetryPollEnabled: true,
+    telemetryPollIntervalMs: 200,
+    telemetryPollTimer: null,
+    telemetryPollInFlight: false,
+    telemetryPollTimeout: null,
+    telemetryPollQuietUntil: 0,
+    telemetryDiagPollDivider: 8,
+    telemetryPollCount: 0,
+    lastDiagCallbackCount: null,
+    lastDiagCallbackTimestamp: 0,
     velocityHistory: [],
     velocityHistoryLimit: 120,
     positionHistory: [],
@@ -26,6 +36,10 @@ const state = {
     positionSliderTimer: null,
     motionProfileWritePendingUntil: 0
 };
+
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 function markDirty(input) {
     if (input) {
@@ -55,21 +69,131 @@ async function connectSerialPort() {
         await state.port.open({ baudRate: 115200 });
 
         state.isConnected = true;
+        state.telemetryPollCount = 0;
+        state.lastDiagCallbackCount = null;
+        state.lastDiagCallbackTimestamp = 0;
         updateConnectionStatus(true);
         console.log('Connected to serial port');
 
         // Start reading data
         readSerialData();
         await sendCommand('GET_MODULATION');
+        await delay(40);
         await getPID();
+        await delay(40);
         await getPositionPID();
+        await delay(40);
         await getFeedforward();
+        await delay(40);
         await getLowSpeedBias();
+        await delay(40);
         await getMotionProfile();
+        await delay(40);
         await getPositionTorqueAssist();
+        startTelemetryPolling();
+        refreshTelemetryPollingUI();
     } catch (error) {
         console.error('Failed to connect:', error);
         updateConnectionStatus(false);
+    }
+}
+
+function startTelemetryPolling() {
+    stopTelemetryPolling();
+    if (!state.telemetryPollEnabled || !state.isConnected) {
+        refreshTelemetryPollingUI();
+        return;
+    }
+    state.telemetryPollInFlight = false;
+    pollTelemetry();
+    state.telemetryPollTimer = setInterval(pollTelemetry, state.telemetryPollIntervalMs);
+    refreshTelemetryPollingUI();
+}
+
+function stopTelemetryPolling() {
+    if (state.telemetryPollTimer) {
+        clearInterval(state.telemetryPollTimer);
+        state.telemetryPollTimer = null;
+    }
+    if (state.telemetryPollTimeout) {
+        clearTimeout(state.telemetryPollTimeout);
+        state.telemetryPollTimeout = null;
+    }
+    state.telemetryPollInFlight = false;
+    refreshTelemetryPollingUI();
+}
+
+async function pollTelemetry() {
+    if (!state.telemetryPollEnabled || !state.isConnected || state.telemetryPollInFlight || Date.now() < state.telemetryPollQuietUntil) {
+        return;
+    }
+
+    state.telemetryPollCount += 1;
+    const command = (state.telemetryPollCount % state.telemetryDiagPollDivider === 0) ? 'GET_DIAG' : 'GET_TELEMETRY';
+    state.telemetryPollInFlight = true;
+    state.telemetryPollTimeout = setTimeout(() => {
+        state.telemetryPollInFlight = false;
+        state.telemetryPollTimeout = null;
+    }, 1000);
+    try {
+        await sendCommand(command, { silent: true });
+    } catch (error) {
+        console.error('Telemetry poll failed:', error);
+        state.telemetryPollInFlight = false;
+        if (state.telemetryPollTimeout) {
+            clearTimeout(state.telemetryPollTimeout);
+            state.telemetryPollTimeout = null;
+        }
+    }
+}
+
+function refreshTelemetryPollingUI() {
+    const toggleBtn = document.getElementById('pollingToggleBtn');
+    const stateLabel = document.getElementById('pollingStateLabel');
+    const slider = document.getElementById('pollingSlider');
+    const intervalValue = document.getElementById('pollingIntervalValue');
+
+    if (slider) {
+        slider.value = String(state.telemetryPollIntervalMs);
+        slider.disabled = !state.telemetryPollEnabled;
+    }
+
+    if (intervalValue) {
+        intervalValue.textContent = `${state.telemetryPollIntervalMs} ms`;
+    }
+
+    if (!toggleBtn || !stateLabel) {
+        return;
+    }
+
+    if (state.telemetryPollEnabled) {
+        toggleBtn.textContent = 'Pause Polling';
+        stateLabel.textContent = state.isConnected
+            ? `Live at ${state.telemetryPollIntervalMs} ms`
+            : `Ready at ${state.telemetryPollIntervalMs} ms`;
+    } else {
+        toggleBtn.textContent = 'Resume Polling';
+        stateLabel.textContent = state.isConnected ? 'Paused' : 'Disabled';
+    }
+}
+
+function updateTelemetryPollingInterval(value) {
+    const intervalMs = Math.max(100, Math.min(2000, parseInt(value, 10) || 200));
+    state.telemetryPollIntervalMs = intervalMs;
+    refreshTelemetryPollingUI();
+
+    if (state.isConnected && state.telemetryPollEnabled) {
+        startTelemetryPolling();
+    }
+}
+
+function toggleTelemetryPolling() {
+    state.telemetryPollEnabled = !state.telemetryPollEnabled;
+
+    if (state.telemetryPollEnabled) {
+        startTelemetryPolling();
+    } else {
+        stopTelemetryPolling();
     }
 }
 
@@ -148,9 +272,15 @@ function processInputBuffer() {
                 }
                 // Check for FOC debug information
                 else if (data.foc !== undefined) {
-                    updateVelocityDisplay(data.foc);
-                    updateFOCDebugDisplay(data.foc);
-                    updateMotionProfileFromTelemetry(data.foc);
+                    const focTelemetry = normalizeFocTelemetry(data.foc);
+                    updateVelocityDisplay(focTelemetry);
+                    updateFOCDebugDisplay(focTelemetry);
+                    updateMotionProfileFromTelemetry(focTelemetry);
+                    if (state.telemetryPollTimeout) {
+                        clearTimeout(state.telemetryPollTimeout);
+                        state.telemetryPollTimeout = null;
+                    }
+                    state.telemetryPollInFlight = false;
                 }
                 // Check for diagnostic (loop count, message status)
                 else if (data.diag !== undefined) {
@@ -213,6 +343,41 @@ function processInputBuffer() {
             }
         }
     }
+}
+
+function normalizeFocTelemetry(focData) {
+    if (!focData || typeof focData !== 'object') {
+        return focData;
+    }
+
+    if (focData.vi === undefined && focData.mechi === undefined) {
+        return focData;
+    }
+
+    const normalized = { ...focData };
+    const assignScaled = (srcKey, dstKey, scale) => {
+        if (focData[srcKey] !== undefined) {
+            normalized[dstKey] = Number(focData[srcKey]) / scale;
+        }
+    };
+
+    assignScaled('vi', 'v', 100);
+    assignScaled('mechi', 'mech', 1000);
+    assignScaled('ti', 't', 100);
+    assignScaled('tri', 'tr', 100);
+    assignScaled('tpi', 'tp', 1000);
+    assignScaled('erri', 'err', 100);
+    assignScaled('uqi', 'uq', 100);
+    assignScaled('vlimi', 'vlim', 100);
+    assignScaled('vrampi', 'vramp', 100);
+    assignScaled('pvlimi', 'pvlim', 100);
+    assignScaled('pacci', 'pacc', 100);
+    assignScaled('pdeci', 'pdec', 100);
+    assignScaled('pboosti', 'pboost', 100);
+    assignScaled('adiri', 'adir', 1000);
+    assignScaled('aligni', 'align', 1000);
+
+    return normalized;
 }
 
 /**
@@ -458,6 +623,41 @@ function updateFOCDebugDisplay(focData) {
         pushPositionSample(parseFloat(focData.mech));
     }
 
+    if (focData.lc !== undefined) {
+        document.getElementById('debugLoopCount').textContent = focData.lc;
+    }
+    if (focData.r !== undefined) {
+        const encValue = parseInt(focData.r, 10);
+        if (Number.isFinite(encValue)) {
+            const encRad = (encValue / 4096.0 * 2 * Math.PI).toFixed(3);
+            document.getElementById('debugEncoderAngle').textContent = `${encValue} (${encRad} rad)`;
+        }
+    }
+    if (focData.cb !== undefined) {
+        const callbackCount = parseInt(focData.cb, 10);
+        document.getElementById('debugEncoderCallbacks').textContent = callbackCount;
+        const now = Date.now();
+        if (Number.isFinite(callbackCount) && state.lastDiagCallbackCount !== null && state.lastDiagCallbackTimestamp > 0) {
+            const deltaCount = callbackCount - state.lastDiagCallbackCount;
+            const deltaMs = now - state.lastDiagCallbackTimestamp;
+            if (deltaMs > 0) {
+                const callbackRate = Math.max(0, Math.round((deltaCount * 1000) / deltaMs));
+                document.getElementById('debugCallbackRate').textContent = `${callbackRate}/sec`;
+            }
+        }
+        state.lastDiagCallbackCount = callbackCount;
+        state.lastDiagCallbackTimestamp = now;
+    }
+    if (focData.derr !== undefined) {
+        document.getElementById('debugI2CErrors').textContent = focData.derr;
+    }
+    if (focData.start !== undefined) {
+        document.getElementById('debugDMAStarts').textContent = focData.start;
+    }
+    if (focData.run !== undefined) {
+        document.getElementById('debugMotorRunning').textContent = focData.run ? 'Yes' : 'No';
+    }
+
     // Update FOC status indicator
     document.getElementById('focStatus').textContent = 'Active';
 
@@ -578,13 +778,15 @@ function updateConnectionStatus(connected) {
             heroConnection.textContent = 'Disconnected';
         }
     }
+
+    refreshTelemetryPollingUI();
 }
 
 /**
  * Send a command to the MCU
  * @param {String} command - Command to send (e.g., 'START', 'STOP')
  */
-async function sendCommand(command) {
+async function sendCommand(command, options = {}) {
     if (!state.isConnected || !state.port) {
         alert('Not connected to serial port. Click the connect button first.');
         return;
@@ -595,7 +797,12 @@ async function sendCommand(command) {
         const data = new TextEncoder().encode(command + '\n');
         await writer.write(data);
         writer.releaseLock();
-        console.log('Sent command:', command);
+        if (!options.silent) {
+            console.log('Sent command:', command);
+        }
+        if (!options.silent) {
+            state.telemetryPollQuietUntil = Date.now() + 300;
+        }
 
         // Reset FOC status when stopping motor
         if (command === 'STOP') {
@@ -1136,6 +1343,7 @@ async function getPositionTorqueAssist() {
  */
 async function disconnectSerialPort() {
     try {
+        stopTelemetryPolling();
         if (state.reader) {
             await state.reader.cancel();
         }
@@ -1145,6 +1353,9 @@ async function disconnectSerialPort() {
         state.isConnected = false;
         state.port = null;
         state.reader = null;
+        state.telemetryPollCount = 0;
+        state.lastDiagCallbackCount = null;
+        state.lastDiagCallbackTimestamp = 0;
         updateConnectionStatus(false);
         console.log('Disconnected from serial port');
     } catch (error) {
@@ -1168,6 +1379,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     syncVelocityControls(parseFloat(document.getElementById('velocityInput')?.value || '1.0'));
     syncPositionControls(parseFloat(document.getElementById('positionInput')?.value || '0.0'));
+    refreshTelemetryPollingUI();
     drawTracePlot();
 
     console.log('Dashboard initialized. Click "Connect Serial Port" to start.');

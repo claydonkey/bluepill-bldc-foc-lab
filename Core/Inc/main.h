@@ -63,6 +63,7 @@ void Error_Handler(void);
 #define HC05_RX_GPIO_Port GPIOA
 #define DFU_EXTI2_Pin GPIO_PIN_2
 #define DFU_EXTI2_GPIO_Port GPIOB
+#define DFU_EXTI2_EXTI_IRQn EXTI2_IRQn
 #define MOT1_EN_Pin GPIO_PIN_15
 #define MOT1_EN_GPIO_Port GPIOB
 #define PWM1a_Pin GPIO_PIN_8
@@ -73,6 +74,7 @@ void Error_Handler(void);
 #define PWM1c_GPIO_Port GPIOA
 
 /* USER CODE BEGIN Private defines */
+#define HC05_ENABLED 0
 #define USB_RX_BUFFER_SIZE 64 // A suitable buffer size for your usb commands
 #define UART_RX_BUFFER_SIZE 96
 extern uint8_t usb_rx_buffer[USB_RX_BUFFER_SIZE];
