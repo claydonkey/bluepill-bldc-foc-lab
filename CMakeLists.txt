@@ -15,7 +15,7 @@ set(CMAKE_C_EXTENSIONS ON)
 
 # Define the build type
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Debug")
+    set(CMAKE_BUILD_TYPE "Release")
 endif()
 
 # Set the project name
@@ -66,3 +66,24 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
 
     # Add user defined libraries
 )
+add_custom_command(
+    TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}> $<TARGET_FILE_DIR:${CMAKE_PROJECT_NAME}>/${CMAKE_PROJECT_NAME}.bin
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/checksum.py $<TARGET_FILE_DIR:${CMAKE_PROJECT_NAME}>/${CMAKE_PROJECT_NAME}.bin
+    COMMAND ${CMAKE_OBJCOPY} -O binary $<TARGET_FILE:${CMAKE_PROJECT_NAME}> $<TARGET_FILE_DIR:${CMAKE_PROJECT_NAME}>/${CMAKE_PROJECT_NAME}.dfu
+    COMMAND python3 ${CMAKE_SOURCE_DIR}/checksum.py $<TARGET_FILE_DIR:${CMAKE_PROJECT_NAME}>/${CMAKE_PROJECT_NAME}.dfu
+    COMMENT "Generating and patching DFU binary for ${CMAKE_PROJECT_NAME}"
+    COMMAND dfu-suffix -a ${CMAKE_BINARY_DIR}/${PROJECT_NAME}.dfu -p 0xdead -v 0xca5d
+    
+
+)
+add_custom_target(run
+   
+    COMMAND dfu-util
+            -a 0 -s 0x08001000:leave
+            -D ${CMAKE_BINARY_DIR}/${PROJECT_NAME}.dfu
+    DEPENDS ${PROJECT_NAME}
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Flashing ${PROJECT_NAME}.dfu"
+)
+add_custom_target(all_run ALL DEPENDS run)

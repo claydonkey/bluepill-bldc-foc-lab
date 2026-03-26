@@ -22,6 +22,7 @@
 #include "i2c.h"
 #include "iwdg.h"
 #include "tim.h"
+#include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
 
@@ -30,6 +31,7 @@
 #include "as5600.h"
 #include "foc.h"
 #include "motor_control.h"
+#include "usbd_cdc_if.h"
 #include <math.h>
 /* USER CODE END Includes */
 
@@ -53,9 +55,24 @@
 /* USER CODE BEGIN PV */
 uint8_t usb_rx_buffer[USB_RX_BUFFER_SIZE];
 uint32_t usb_rx_len = 0;
+uint8_t uart_rx_buffer[UART_RX_BUFFER_SIZE];
+uint32_t uart_rx_len = 0;
 volatile uint8_t foc_flag = 0;
 volatile uint8_t usb_rx_ready = 0;
-extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
+volatile uint8_t uart_rx_ready = 0;
+static uint8_t uart2_rx_byte = 0;
+static char uart_line_buffer[UART_RX_BUFFER_SIZE];
+static uint32_t uart_line_len = 0;
+
+typedef enum
+{
+	COMMAND_TRANSPORT_USB = 0,
+	COMMAND_TRANSPORT_UART = 1
+} CommandTransport_t;
+
+static volatile CommandTransport_t active_command_transport = COMMAND_TRANSPORT_USB;
+
+extern uint8_t USB_CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 
 // Telemetry variables for sending velocity data
 #define TELEMETRY_INTERVAL 50 // Send velocity every 50ms (20 Hz)
@@ -75,6 +92,7 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 void process_usb_command(const char *cmd_buf, uint32_t len);
 static void BluePill_ForceUsbReenumeration(void);
+uint8_t Command_Transmit(uint8_t *Buf, uint16_t Len);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -147,6 +165,21 @@ static void BluePill_ForceUsbReenumeration(void)
 	HAL_Delay(20);
 }
 
+uint8_t Command_Transmit(uint8_t *Buf, uint16_t Len)
+{
+	if ((Buf == NULL) || (Len == 0U))
+	{
+		return USBD_FAIL;
+	}
+
+	if (active_command_transport == COMMAND_TRANSPORT_UART)
+	{
+		return (USART2_Transmit_Blocking(Buf, Len, 100U) == 0U) ? USBD_OK : USBD_FAIL;
+	}
+
+	return USB_CDC_Transmit_FS(Buf, Len);
+}
+
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM2)
@@ -154,6 +187,48 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 		foc_flag = 1;
 		//	FOC_Loop();  // Don't call from ISR - breaks CDC
+	}
+}
+
+void HC05_OnByteReceived(uint8_t ch)
+{
+	if ((ch == '\r') || (ch == '\n'))
+	{
+		if ((uart_line_len > 0U) && !uart_rx_ready)
+		{
+			memcpy(uart_rx_buffer, uart_line_buffer, uart_line_len);
+			uart_rx_buffer[uart_line_len] = '\0';
+			uart_rx_len = uart_line_len;
+			uart_rx_ready = 1U;
+			uart_line_len = 0U;
+		}
+	}
+	else if (uart_line_len < (UART_RX_BUFFER_SIZE - 1U))
+	{
+		uart_line_buffer[uart_line_len++] = (char) ch;
+	}
+	else
+	{
+		uart_line_len = 0U;
+	}
+}
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == USART2)
+	{
+		HC05_OnByteReceived(uart2_rx_byte);
+		HAL_UART_Receive_IT(&huart2, &uart2_rx_byte, 1U);
+	}
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	if (huart->Instance == USART2)
+	{
+		__HAL_UART_CLEAR_OREFLAG(huart);
+		uart_line_len = 0U;
+		HAL_UART_Receive_IT(&huart2, &uart2_rx_byte, 1U);
 	}
 }
 
@@ -176,7 +251,6 @@ void start_motor()
 	HAL_GPIO_WritePin(MOT1_EN_GPIO_Port, MOT1_EN_Pin, GPIO_PIN_SET);
 
 	// Send status message about motor driver enable
-	extern uint8_t CDC_Transmit_FS(uint8_t *Buf, uint16_t Len);
 	char status_msg[64];
 	int len = snprintf(status_msg, sizeof(status_msg), "{\"motor_driver\":\"enabled\"}\r\n");
 	if (len > 0 && len < (int) sizeof(status_msg))
@@ -514,6 +588,7 @@ int main(void)
 	MX_GPIO_Init();
 	MX_DMA_Init();
 	MX_I2C1_Init();
+	MX_USART2_UART_Init();
 	BluePill_ForceUsbReenumeration();
 	MX_USB_DEVICE_Init();
 	MX_TIM1_Init();
@@ -531,6 +606,7 @@ int main(void)
 
 	// Start FOC timer for continuous velocity measurement
 	HAL_TIM_Base_Start_IT(&htim2);
+	HAL_UART_Receive_IT(&huart2, &uart2_rx_byte, 1U);
 
 	control_mode = MODE_VELOCITY;
 	target_velocity = 0.0f; // Start with zero velocity - wait for START command
@@ -547,10 +623,21 @@ int main(void)
 		HAL_IWDG_Refresh(&hiwdg);
 		if (usb_rx_ready)
 		{
+			active_command_transport = COMMAND_TRANSPORT_USB;
 			process_usb_command((const char*) usb_rx_buffer, usb_rx_len);
 			usb_rx_ready = 0;															// Clear the flag
 			usb_rx_len = 0;																// Reset length
 			memset(usb_rx_buffer, 0, USB_RX_BUFFER_SIZE); // Clear buffer for next reception
+			active_command_transport = COMMAND_TRANSPORT_USB;
+		}
+		if (uart_rx_ready)
+		{
+			active_command_transport = COMMAND_TRANSPORT_UART;
+			process_usb_command((const char*) uart_rx_buffer, uart_rx_len);
+			uart_rx_ready = 0;
+			uart_rx_len = 0;
+			memset(uart_rx_buffer, 0, UART_RX_BUFFER_SIZE);
+			active_command_transport = COMMAND_TRANSPORT_USB;
 		}
 		AS5600_Service();
 		if (foc_flag)
@@ -667,13 +754,13 @@ void SystemClock_Config(void)
 // Implement the command processing function
 void process_usb_command(const char *cmd_buf, uint32_t len)
 {
-	char command[USB_RX_BUFFER_SIZE];
+	char command[UART_RX_BUFFER_SIZE];
 	uint32_t actual_len = len;
 
 	// Copy to a local buffer to ensure it's mutable and null-terminated
-	if (actual_len >= USB_RX_BUFFER_SIZE)
+	if (actual_len >= UART_RX_BUFFER_SIZE)
 	{
-		actual_len = USB_RX_BUFFER_SIZE - 1;
+		actual_len = UART_RX_BUFFER_SIZE - 1;
 	}
 	strncpy(command, cmd_buf, actual_len);
 	command[actual_len] = '\0'; // Ensure null termination
@@ -691,7 +778,22 @@ void process_usb_command(const char *cmd_buf, uint32_t len)
 		}
 	}
 
-	if (strcmp(command, "START") == 0)
+	if (strcmp(command, "PING") == 0)
+	{
+		CDC_Transmit_FS((uint8_t*) "{\"ping\":\"pong\"}\r\n", strlen("{\"ping\":\"pong\"}\r\n"));
+	}
+	else if (strcmp(command, "GET_STATUS") == 0)
+	{
+		char status_msg[160];
+		int status_len = snprintf(status_msg, sizeof(status_msg),
+				"{\"status\":{\"running\":%u,\"mode\":%u,\"target_velocity\":%.3f,\"target_position\":%.3f}}\r\n",
+				motor_running, (unsigned int) control_mode, target_velocity, target_position);
+		if (status_len > 0 && status_len < (int) sizeof(status_msg))
+		{
+			CDC_Transmit_FS((uint8_t*) status_msg, status_len);
+		}
+	}
+	else if (strcmp(command, "START") == 0)
 	{
 		// Start the motor
 		start_motor();

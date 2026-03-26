@@ -275,7 +275,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
 	// This must be called to allow the USB host to send more data
 	USBD_CDC_ReceivePacket(&hUsbDeviceFS);
 
-	return (USBD_OK);
+  return (USBD_OK);
   /* USER CODE END 6 */
 }
 
@@ -290,7 +290,7 @@ static int8_t CDC_Receive_FS(uint8_t* Buf, uint32_t *Len)
   * @param  Len: Number of data to be sent (in bytes)
   * @retval USBD_OK if all operations are OK else USBD_FAIL or USBD_BUSY
   */
-uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
+uint8_t USB_CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
 {
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 7 */
@@ -316,6 +316,24 @@ uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
 }
 
 /* USER CODE BEGIN PRIVATE_FUNCTIONS_IMPLEMENTATION */
+extern uint8_t Command_Transmit(uint8_t* Buf, uint16_t Len);
+
+/**
+  * @brief  CDC_Transmit_FS
+  *         Data to send over USB IN endpoint are sent over CDC interface
+  *         through this function.
+  *         @note
+  *
+  *
+  * @param  Buf: Buffer of data to be sent
+  * @param  Len: Number of data to be sent (in bytes)
+  * @retval USBD_OK if all operations are OK else USBD_FAIL or USBD_BUSY
+  */
+uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len)
+{
+  return Command_Transmit(Buf, Len);
+}
+
 int _write(int file, char *ptr, int len)
 {
 	(void)file;
@@ -325,7 +343,7 @@ int _write(int file, char *ptr, int len)
 	}
 
 	// Debug prints must never stall the command/control path.
-	if (CDC_Transmit_FS((uint8_t*)ptr, (uint16_t)len) == USBD_OK)
+	if (USB_CDC_Transmit_FS((uint8_t*)ptr, (uint16_t)len) == USBD_OK)
 	{
 		return len;
 	}
