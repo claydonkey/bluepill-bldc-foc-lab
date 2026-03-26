@@ -142,10 +142,25 @@ function toggleTheme() {
     applyTheme(state.theme === 'dark' ? 'light' : 'dark');
 }
 
+function webSerialSupported() {
+    return typeof navigator !== 'undefined' &&
+        !!navigator.serial &&
+        typeof navigator.serial.requestPort === 'function';
+}
+
 /**
  * Initialize the Web Serial API connection
  */
 async function connectSerialPort() {
+    if (!webSerialSupported()) {
+        const message = 'Web Serial is not available in this browser. Use Chrome or Edge on desktop over HTTPS.';
+        console.error(message);
+        appendDebugConsole(`ERR ${message}`, 'err');
+        alert(message);
+        updateConnectionStatus(false);
+        return;
+    }
+
     try {
         // Request a port from the user
         state.port = await navigator.serial.requestPort();
@@ -1766,6 +1781,11 @@ document.addEventListener('DOMContentLoaded', function () {
     connectBtn.textContent = 'Connect Serial Port';
     connectBtn.className = 'connect-button';
     connectBtn.onclick = connectSerialPort;
+    if (!webSerialSupported()) {
+        connectBtn.textContent = 'Web Serial Unsupported';
+        connectBtn.disabled = true;
+        connectBtn.title = 'Use Chrome or Edge on desktop to access Web Serial.';
+    }
 
     const themeBtn = document.createElement('button');
     themeBtn.id = 'themeToggleBtn';
@@ -1799,8 +1819,13 @@ document.addEventListener('DOMContentLoaded', function () {
     refreshTelemetryPollingUI();
     drawTracePlot();
 
-    console.log('Dashboard initialized. Click "Connect Serial Port" to start.');
-});
+    if (webSerialSupported()) {
+        console.log('Dashboard initialized. Click "Connect Serial Port" to start.');
+    } else {
+        console.warn('Dashboard initialized, but Web Serial is unavailable in this browser.');
+        appendDebugConsole('SYS Web Serial unavailable. Use Chrome or Edge on desktop.', 'sys');
+    }
+  });
 
 /**
  * Handle page unload - disconnect gracefully
