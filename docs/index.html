@@ -213,6 +213,37 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             gap: 12px;
         }
 
+        .hero-diagnostics {
+            display: grid;
+            gap: 10px;
+        }
+
+        .diagnostic-row {
+            display: grid;
+            grid-template-columns: 128px 1fr;
+            gap: 12px;
+            align-items: start;
+            padding: 10px 12px;
+            border-radius: 14px;
+            background: var(--hero-stat-bg);
+            border: 1px solid var(--hero-stat-border);
+        }
+
+        .diagnostic-label {
+            color: var(--muted);
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.09em;
+            font-weight: 700;
+        }
+
+        .diagnostic-value {
+            color: var(--text);
+            font-size: 0.9rem;
+            line-height: 1.45;
+            word-break: break-word;
+        }
+
         .hero-stat {
             padding: 14px 16px;
             border-radius: 18px;
@@ -1002,7 +1033,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             .gauge-container,
             .button-group,
             .debug-grid,
-            .hero-card-grid {
+            .hero-card-grid,
+            .diagnostic-row {
                 grid-template-columns: 1fr;
             }
 
@@ -1049,6 +1081,24 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                             <div class="hero-stat-label">Voltage Limit</div>
                             <div class="hero-stat-value" id="heroVoltageLimit">—</div>
                         </div>
+                    </div>
+                </div>
+                <div class="hero-card hero-diagnostics">
+                    <div class="diagnostic-row">
+                        <div class="diagnostic-label">Secure Context</div>
+                        <div class="diagnostic-value" id="diagnosticSecure">Checking...</div>
+                    </div>
+                    <div class="diagnostic-row">
+                        <div class="diagnostic-label">Web Serial</div>
+                        <div class="diagnostic-value" id="diagnosticSerial">Checking...</div>
+                    </div>
+                    <div class="diagnostic-row">
+                        <div class="diagnostic-label">Page Origin</div>
+                        <div class="diagnostic-value" id="diagnosticOrigin">Checking...</div>
+                    </div>
+                    <div class="diagnostic-row">
+                        <div class="diagnostic-label">Browser</div>
+                        <div class="diagnostic-value" id="diagnosticBrowser">Checking...</div>
                     </div>
                 </div>
             </div>

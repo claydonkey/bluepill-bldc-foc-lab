@@ -148,6 +148,29 @@ function webSerialSupported() {
         typeof navigator.serial.requestPort === 'function';
 }
 
+function setDiagnosticValue(id, text) {
+    const node = document.getElementById(id);
+    if (node) {
+        node.textContent = text;
+    }
+}
+
+function updateBrowserDiagnostics() {
+    const secure = window.isSecureContext ? 'Yes' : 'No';
+    const serial = webSerialSupported()
+        ? 'Available'
+        : 'Unavailable. Use desktop Chrome or Edge over HTTPS.';
+    const origin = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
+    const ua = typeof navigator !== 'undefined' && navigator.userAgent
+        ? navigator.userAgent
+        : 'Unavailable';
+
+    setDiagnosticValue('diagnosticSecure', secure);
+    setDiagnosticValue('diagnosticSerial', serial);
+    setDiagnosticValue('diagnosticOrigin', origin);
+    setDiagnosticValue('diagnosticBrowser', ua);
+}
+
 /**
  * Initialize the Web Serial API connection
  */
@@ -1776,6 +1799,7 @@ async function disconnectSerialPort() {
  */
 document.addEventListener('DOMContentLoaded', function () {
     applyTheme(loadStoredTheme());
+    updateBrowserDiagnostics();
 
     const connectBtn = document.createElement('button');
     connectBtn.textContent = 'Connect Serial Port';
