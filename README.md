@@ -3,7 +3,7 @@
 This project is a field-oriented control (FOC) motor-control application for a Bluepill-class `STM32F103CBT6` board, with:
 
 - USB CDC command and telemetry
-- a browser dashboard built with `app.html` + `app.js`
+- a browser dashboard built with `index.html` + `app.js`
 - AS5600 magnetic encoder feedback
 - velocity and position control modes
 - runtime tuning and trace export from the web UI
@@ -29,9 +29,9 @@ That only works after the board has first been prepared with the included bootlo
 
 - `Core/`, `Drivers/`, `Middlewares/`, `USB_DEVICE/`
   - STM32 firmware source
-- [app.html](./app.html)
+- [index.html](./web/index.html)
   - browser dashboard
-- [app.js](./app.js)
+- [app.js](./web/app.js)
   - Web Serial UI, telemetry plots, tuning, trace export
 - [TELEMETRY_PROTOCOL.md](./TELEMETRY_PROTOCOL.md)
   - USB command and telemetry packet reference
@@ -309,13 +309,13 @@ If you are wiring a board for repeated updates, make sure that signal is availab
 
 Serve the project root with a local web server, then open:
 
-- [app.html](./app.html)
+- [index.html](./web/index.html)
 
 Example with VS Code Live Server:
 
 1. Open the repository folder in VS Code
 2. Start Live Server
-3. Open `app.html`
+3. Open `web/index.html`
 4. Click the serial connect button in the page
 5. Select the STM32 USB CDC port
 
