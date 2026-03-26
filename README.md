@@ -1,6 +1,6 @@
 # Bluepill BLDC FOC Lab
 
-[![Live App](https://img.shields.io/badge/Live%20App-GitHub%20Pages-2563eb)](https://claydonkey.github.io/bluepill-bldc-foc-lab/)
+[![Live App](https://img.shields.io/badge/Live%20App-GitHub%20Pages-2563eb)](https://bldc.claydonkey.com)
 
 This project is a field-oriented control (FOC) motor-control application for a Bluepill-class `STM32F103CBT6` board, with:
 
@@ -13,7 +13,7 @@ This project is a field-oriented control (FOC) motor-control application for a B
 
 ## Live Demo
 
-[Open the Bluepill BLDC FOC Lab Web App](https://claydonkey.github.io/bluepill-bldc-foc-lab/)
+[Open the Bluepill BLDC FOC Lab Web App](https://bldc.claydonkey.com)
 
 ## Mission
 
