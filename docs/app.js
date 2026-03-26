@@ -128,14 +128,11 @@ function applyTheme(theme) {
 
 function loadStoredTheme() {
     try {
-        const stored = localStorage.getItem(THEME_STORAGE_KEY);
-        if (stored === 'dark' || stored === 'light') {
-            return stored;
-        }
+        const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
+        return stored === 'dark' || stored === 'light' ? stored : 'light';
     } catch (error) {
-        console.warn('Failed to load stored theme:', error);
+        return 'light';
     }
-    return 'light';
 }
 
 function toggleTheme() {
@@ -146,29 +143,6 @@ function webSerialSupported() {
     return typeof navigator !== 'undefined' &&
         !!navigator.serial &&
         typeof navigator.serial.requestPort === 'function';
-}
-
-function setDiagnosticValue(id, text) {
-    const node = document.getElementById(id);
-    if (node) {
-        node.textContent = text;
-    }
-}
-
-function updateBrowserDiagnostics() {
-    const secure = window.isSecureContext ? 'Yes' : 'No';
-    const serial = webSerialSupported()
-        ? 'Available'
-        : 'Unavailable. Use desktop Chrome or Edge over HTTPS.';
-    const origin = `${window.location.protocol}//${window.location.host}${window.location.pathname}`;
-    const ua = typeof navigator !== 'undefined' && navigator.userAgent
-        ? navigator.userAgent
-        : 'Unavailable';
-
-    setDiagnosticValue('diagnosticSecure', secure);
-    setDiagnosticValue('diagnosticSerial', serial);
-    setDiagnosticValue('diagnosticOrigin', origin);
-    setDiagnosticValue('diagnosticBrowser', ua);
 }
 
 /**
@@ -230,6 +204,14 @@ async function connectSerialPort() {
         appendDebugConsole(`ERR Connect failed: ${error}`, 'err');
         updateConnectionStatus(false);
     }
+}
+
+async function handleConnectButton() {
+    if (state.isConnected) {
+        await disconnectSerialPort();
+        return;
+    }
+    await connectSerialPort();
 }
 
 function startTelemetryPolling() {
@@ -951,6 +933,7 @@ function updateConnectionStatus(connected) {
     const statusText = document.getElementById('connectionText');
     const heroConnection = document.getElementById('heroConnection');
     const dfuButton = document.getElementById('dfuModeBtn');
+    const connectButton = document.getElementById('connectBtn');
 
     if (connected) {
         statusElement.classList.add('connected');
@@ -970,6 +953,10 @@ function updateConnectionStatus(connected) {
 
     if (dfuButton) {
         dfuButton.style.display = connected ? 'inline-flex' : 'none';
+    }
+
+    if (connectButton && webSerialSupported()) {
+        connectButton.textContent = connected ? 'Disconnect Serial Port' : 'Connect Serial Port';
     }
 
     refreshTelemetryPollingUI();
@@ -998,22 +985,22 @@ async function sendCommand(command, options = {}) {
             state.telemetryPollQuietUntil = Date.now() + 300;
         }
 
-          // Reset FOC status when stopping motor
-          if (command === 'STOP') {
-              document.getElementById('focStatus').textContent = 'Stopped';
-              // Clear debug values
-              document.getElementById('debugTarget').textContent = '—';
-              document.getElementById('debugActual').textContent = '—';
-              document.getElementById('debugError').textContent = '—';
-              document.getElementById('debugUq').textContent = '—';
-              document.getElementById('debugPwmA').textContent = '—';
-              document.getElementById('debugPwmB').textContent = '—';
-              document.getElementById('debugPwmC').textContent = '—';
-          }
-      } catch (error) {
+        // Reset FOC status when stopping motor
+        if (command === 'STOP') {
+            document.getElementById('focStatus').textContent = 'Stopped';
+            // Clear debug values
+            document.getElementById('debugTarget').textContent = '—';
+            document.getElementById('debugActual').textContent = '—';
+            document.getElementById('debugError').textContent = '—';
+            document.getElementById('debugUq').textContent = '—';
+            document.getElementById('debugPwmA').textContent = '—';
+            document.getElementById('debugPwmB').textContent = '—';
+            document.getElementById('debugPwmC').textContent = '—';
+        }
+    } catch (error) {
         console.error('Failed to send command:', error);
         appendDebugConsole(`ERR TX failed for ${command}: ${error}`, 'err');
-      }
+    }
 }
 
 /**
@@ -1799,12 +1786,12 @@ async function disconnectSerialPort() {
  */
 document.addEventListener('DOMContentLoaded', function () {
     applyTheme(loadStoredTheme());
-    updateBrowserDiagnostics();
 
     const connectBtn = document.createElement('button');
+    connectBtn.id = 'connectBtn';
     connectBtn.textContent = 'Connect Serial Port';
     connectBtn.className = 'connect-button';
-    connectBtn.onclick = connectSerialPort;
+    connectBtn.onclick = handleConnectButton;
     if (!webSerialSupported()) {
         connectBtn.textContent = 'Web Serial Unsupported';
         connectBtn.disabled = true;
@@ -1813,13 +1800,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const themeBtn = document.createElement('button');
     themeBtn.id = 'themeToggleBtn';
-    themeBtn.className = 'connect-button toolbar-button';
+    themeBtn.className = 'btn-secondary';
     themeBtn.onclick = toggleTheme;
 
     const dfuBtn = document.createElement('button');
     dfuBtn.id = 'dfuModeBtn';
     dfuBtn.textContent = 'DFU';
-    dfuBtn.className = 'connect-button toolbar-button dfu-button';
+    dfuBtn.className = 'connect-button dfu-button';
     dfuBtn.onclick = requestDfuMode;
     dfuBtn.style.display = 'none';
 
@@ -1849,7 +1836,7 @@ document.addEventListener('DOMContentLoaded', function () {
         console.warn('Dashboard initialized, but Web Serial is unavailable in this browser.');
         appendDebugConsole('SYS Web Serial unavailable. Use Chrome or Edge on desktop.', 'sys');
     }
-  });
+});
 
 /**
  * Handle page unload - disconnect gracefully

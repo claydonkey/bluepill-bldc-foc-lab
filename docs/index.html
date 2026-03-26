@@ -9,6 +9,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bluepill BLDC FOC Lab</title>
+    <link rel="icon" type="image/svg+xml" href="./lemon.svg">
+    <link rel="stylesheet" href="./shared-theme.css">
     <style>
         * {
             margin: 0;
@@ -34,84 +36,31 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             --success: #0f766e;
             --shadow: 0 24px 70px rgba(3, 10, 20, 0.35);
             --shadow-soft: 0 12px 30px rgba(15, 23, 42, 0.08);
-            --container-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(248, 250, 252, 0.96) 100%);
-            --container-border: rgba(255, 255, 255, 0.45);
-            --hero-card-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(241, 245, 249, 0.95) 100%);
-            --hero-card-border: rgba(148, 163, 184, 0.22);
-            --hero-stat-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            --hero-stat-border: rgba(148, 163, 184, 0.18);
-            --eyebrow-bg: rgba(37, 99, 235, 0.09);
-            --eyebrow-border: rgba(37, 99, 235, 0.14);
-            --footer-chip-bg: rgba(255, 255, 255, 0.6);
-            --footer-chip-border: rgba(148, 163, 184, 0.2);
-            --toolbar-button-bg: rgba(255, 255, 255, 0.72);
-            --toolbar-button-border: rgba(148, 163, 184, 0.22);
-            --toolbar-button-text: var(--text);
-            --btn-query-bg: rgba(255, 255, 255, 0.92);
-            --btn-query-border: rgba(37, 99, 235, 0.22);
-            --btn-query-text: #1d4ed8;
-            --btn-query-shadow: rgba(37, 99, 235, 0.12);
-            --plot-badge-bg: rgba(255, 255, 255, 0.9);
-            --plot-frame-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
-            --plot-frame-border: rgba(148, 163, 184, 0.18);
-            --plot-grid: rgba(148, 163, 184, 0.14);
-            --plot-axis: rgba(148, 163, 184, 0.55);
-            --plot-zero: rgba(37, 99, 235, 0.75);
-            --plot-label: rgba(82, 98, 119, 0.92);
+            --shell-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.88) 0%, rgba(248, 250, 252, 0.96) 100%);
+            --shell-border: rgba(255, 255, 255, 0.45);
+            --stat-bg: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+            --stat-border: rgba(148, 163, 184, 0.18);
             --field-bg: rgba(255, 255, 255, 0.96);
             --field-border: rgba(148, 163, 184, 0.22);
-            --debug-item-bg: rgba(255, 255, 255, 0.96);
-            --debug-item-border: rgba(148, 163, 184, 0.18);
-            --info-box-bg: linear-gradient(145deg, rgba(219, 234, 254, 0.8) 0%, rgba(224, 242, 254, 0.95) 100%);
-            --info-box-border: rgba(37, 99, 235, 0.14);
-            --subpanel-bg: rgba(255, 255, 255, 0.58);
-            --subpanel-border: rgba(148, 163, 184, 0.2);
         }
 
         :root[data-theme="dark"] {
-            --bg-1: #030712;
-            --bg-2: #0b1120;
-            --bg-3: #10233f;
             --panel: rgba(15, 23, 42, 0.92);
             --panel-soft: rgba(15, 23, 42, 0.96);
             --panel-strong: rgba(17, 24, 39, 0.98);
             --text: #e2e8f0;
             --muted: #9fb0c7;
             --border: rgba(148, 163, 184, 0.18);
+            --surface-button: #1e293b;
             --shadow: 0 24px 70px rgba(2, 6, 23, 0.58);
             --shadow-soft: 0 12px 30px rgba(2, 6, 23, 0.32);
-            --container-bg: linear-gradient(180deg, rgba(9, 14, 24, 0.92) 0%, rgba(13, 20, 34, 0.96) 100%);
-            --container-border: rgba(148, 163, 184, 0.14);
-            --hero-card-bg: linear-gradient(180deg, rgba(15, 23, 42, 0.96) 0%, rgba(20, 31, 52, 0.96) 100%);
-            --hero-card-border: rgba(148, 163, 184, 0.16);
-            --hero-stat-bg: linear-gradient(180deg, rgba(17, 24, 39, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
-            --hero-stat-border: rgba(148, 163, 184, 0.14);
-            --eyebrow-bg: rgba(37, 99, 235, 0.16);
-            --eyebrow-border: rgba(96, 165, 250, 0.24);
-            --footer-chip-bg: rgba(15, 23, 42, 0.82);
-            --footer-chip-border: rgba(148, 163, 184, 0.16);
-            --toolbar-button-bg: rgba(15, 23, 42, 0.86);
-            --toolbar-button-border: rgba(148, 163, 184, 0.16);
-            --toolbar-button-text: #e2e8f0;
-            --btn-query-bg: rgba(15, 23, 42, 0.94);
-            --btn-query-border: rgba(96, 165, 250, 0.28);
-            --btn-query-text: #93c5fd;
-            --btn-query-shadow: rgba(96, 165, 250, 0.14);
-            --plot-badge-bg: rgba(15, 23, 42, 0.92);
-            --plot-frame-bg: linear-gradient(180deg, rgba(8, 14, 26, 0.98) 0%, rgba(12, 20, 36, 0.98) 100%);
-            --plot-frame-border: rgba(148, 163, 184, 0.16);
-            --plot-grid: rgba(148, 163, 184, 0.11);
-            --plot-axis: rgba(148, 163, 184, 0.4);
-            --plot-zero: rgba(96, 165, 250, 0.72);
-            --plot-label: rgba(159, 176, 199, 0.92);
+            --shell-bg: linear-gradient(180deg, rgba(9, 14, 24, 0.92) 0%, rgba(13, 20, 34, 0.96) 100%);
+            --shell-border: rgba(148, 163, 184, 0.14);
+            --stat-bg: linear-gradient(180deg, rgba(17, 24, 39, 0.98) 0%, rgba(15, 23, 42, 0.98) 100%);
+            --stat-border: rgba(148, 163, 184, 0.14);
             --field-bg: rgba(15, 23, 42, 0.96);
             --field-border: rgba(148, 163, 184, 0.16);
-            --debug-item-bg: rgba(15, 23, 42, 0.96);
-            --debug-item-border: rgba(148, 163, 184, 0.16);
-            --info-box-bg: linear-gradient(145deg, rgba(10, 25, 47, 0.92) 0%, rgba(15, 32, 58, 0.96) 100%);
-            --info-box-border: rgba(96, 165, 250, 0.18);
-            --subpanel-bg: rgba(15, 23, 42, 0.54);
-            --subpanel-border: rgba(148, 163, 184, 0.14);
+
         }
 
         body {
@@ -127,6 +76,18 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             padding: 28px 18px 40px;
             color: var(--text);
             transition: background 0.25s ease, color 0.25s ease;
+        }
+
+        button {
+            border: 0;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
         }
 
         .container {
@@ -149,6 +110,14 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             letter-spacing: -0.05em;
         }
 
+        .hero-title-icon {
+            width: 116px;
+            height: 116px;
+            display: block;
+            margin-bottom: 10px;
+            margin-top: -8px;
+        }
+
         h2,
         h3 {
             color: var(--text);
@@ -167,20 +136,20 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             padding: 8px 0 0;
         }
 
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            margin-bottom: 12px;
-            padding: 7px 12px;
-            border-radius: 999px;
-            background: var(--eyebrow-bg);
-            border: 1px solid var(--eyebrow-border);
-            color: var(--accent-3);
-            font-size: 0.76rem;
-            font-weight: 700;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
+        .hero-brand-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 4px;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+            padding-top: 10px;
         }
 
         .hero-copy p {
@@ -211,37 +180,6 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 12px;
-        }
-
-        .hero-diagnostics {
-            display: grid;
-            gap: 10px;
-        }
-
-        .diagnostic-row {
-            display: grid;
-            grid-template-columns: 128px 1fr;
-            gap: 12px;
-            align-items: start;
-            padding: 10px 12px;
-            border-radius: 14px;
-            background: var(--hero-stat-bg);
-            border: 1px solid var(--hero-stat-border);
-        }
-
-        .diagnostic-label {
-            color: var(--muted);
-            font-size: 0.72rem;
-            text-transform: uppercase;
-            letter-spacing: 0.09em;
-            font-weight: 700;
-        }
-
-        .diagnostic-value {
-            color: var(--text);
-            font-size: 0.9rem;
-            line-height: 1.45;
-            word-break: break-word;
         }
 
         .hero-stat {
@@ -941,55 +879,7 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             margin-bottom: 16px;
         }
 
-        .connect-button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            min-height: 48px;
-            padding: 0 18px;
-            border-radius: 14px;
-            font-size: 0.95rem;
-            font-weight: 700;
-            letter-spacing: 0.01em;
-            cursor: pointer;
-            transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease, background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
-        }
 
-        .connect-button {
-            display: inline-flex;
-            border: none;
-            background: linear-gradient(135deg, var(--accent-2) 0%, var(--accent-3) 100%);
-            color: #fff;
-            box-shadow: 0 14px 28px rgba(37, 99, 235, 0.22);
-        }
-
-        .connect-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 16px 30px rgba(37, 99, 235, 0.28);
-            filter: saturate(1.04);
-        }
-
-        .connect-button:active {
-            transform: translateY(0);
-        }
-
-        .toolbar-button {
-            border: 1px solid var(--toolbar-button-border);
-            background: var(--toolbar-button-bg);
-            color: var(--toolbar-button-text);
-            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
-        }
-
-        .toolbar-button:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
-            filter: none;
-        }
-
-        .toolbar-button:active {
-            transform: translateY(0);
-        }
 
         .dfu-button {
             border: 1px solid rgba(220, 38, 38, 0.24);
@@ -1033,8 +923,7 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
             .gauge-container,
             .button-group,
             .debug-grid,
-            .hero-card-grid,
-            .diagnostic-row {
+            .hero-card-grid {
                 grid-template-columns: 1fr;
             }
 
@@ -1051,10 +940,12 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
 
 <body>
     <div class="container">
-        <div class="toolbar-slot" id="toolbarSlot"></div>
         <div class="hero">
             <div class="hero-copy">
-                <div class="eyebrow">Bluepill FOC Console</div>
+                <div class="hero-brand-row">
+                    <img src="./lemon.svg" alt="" class="hero-title-icon">
+                    <div class="hero-actions" id="toolbarSlot"></div>
+                </div>
                 <h1>
                     Bluepill BLDC FOC Lab
                     <span class="connection-status disconnected" id="connectionStatus"></span>
@@ -1081,24 +972,6 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                             <div class="hero-stat-label">Voltage Limit</div>
                             <div class="hero-stat-value" id="heroVoltageLimit">—</div>
                         </div>
-                    </div>
-                </div>
-                <div class="hero-card hero-diagnostics">
-                    <div class="diagnostic-row">
-                        <div class="diagnostic-label">Secure Context</div>
-                        <div class="diagnostic-value" id="diagnosticSecure">Checking...</div>
-                    </div>
-                    <div class="diagnostic-row">
-                        <div class="diagnostic-label">Web Serial</div>
-                        <div class="diagnostic-value" id="diagnosticSerial">Checking...</div>
-                    </div>
-                    <div class="diagnostic-row">
-                        <div class="diagnostic-label">Page Origin</div>
-                        <div class="diagnostic-value" id="diagnosticOrigin">Checking...</div>
-                    </div>
-                    <div class="diagnostic-row">
-                        <div class="diagnostic-label">Browser</div>
-                        <div class="diagnostic-value" id="diagnosticBrowser">Checking...</div>
                     </div>
                 </div>
             </div>
@@ -1154,8 +1027,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                         <div class="status-item">
                             <span class="status-label">Polling Interval</span>
                             <div class="status-item-controls">
-                                <input type="range" id="pollingSlider" class="range-input" min="100" max="2000" step="50"
-                                    value="200" oninput="updateTelemetryPollingInterval(this.value)">
+                                <input type="range" id="pollingSlider" class="range-input" min="100" max="2000"
+                                    step="50" value="200" oninput="updateTelemetryPollingInterval(this.value)">
                                 <span class="status-inline-value" id="pollingIntervalValue">200 ms</span>
                             </div>
                         </div>
@@ -1233,8 +1106,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                         <div class="control-subpanel">
                             <div class="stack-label" style="margin-bottom: 8px; text-align: center;">Velocity</div>
                             <div class="range-stack" style="margin-bottom: 12px;">
-                                <input type="range" id="velocitySlider" class="range-input" min="-100" max="100" step="0.1"
-                                    value="1.0" oninput="syncVelocityFromSlider()">
+                                <input type="range" id="velocitySlider" class="range-input" min="-100" max="100"
+                                    step="0.1" value="1.0" oninput="syncVelocityFromSlider()">
                                 <div class="range-meta">
                                     <span>-100 rad/s</span>
                                     <span>100 rad/s</span>
@@ -1251,8 +1124,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                         <div class="control-subpanel">
                             <div class="stack-label" style="margin-bottom: 8px; text-align: center;">Position</div>
                             <div class="range-stack" style="margin-bottom: 12px;">
-                                <input type="range" id="positionSlider" class="range-input" min="-314.159" max="314.159" step="0.01"
-                                    value="0.0" oninput="syncPositionFromSlider()">
+                                <input type="range" id="positionSlider" class="range-input" min="-314.159" max="314.159"
+                                    step="0.01" value="0.0" oninput="syncPositionFromSlider()">
                                 <div class="range-meta">
                                     <span>-100π rad</span>
                                     <span>+100π rad</span>
@@ -1260,7 +1133,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                             </div>
                             <div class="input-group">
                                 <input type="number" id="positionInput" placeholder="Enter target position (rad)"
-                                    step="0.1" min="-314.159" max="314.159" value="0.0" oninput="syncPositionFromInput()">
+                                    step="0.1" min="-314.159" max="314.159" value="0.0"
+                                    oninput="syncPositionFromInput()">
                                 <button class="btn-primary" onclick="setPosition()">Set</button>
                                 <button class="btn-secondary" onclick="getPosition()">Get</button>
                             </div>
@@ -1303,19 +1177,23 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                     </div>
                     <div class="control-subpanel">
                         <div class="subpanel-title" style="margin-bottom: 12px;">Velocity</div>
-                        <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(3, minmax(0, 1fr));">
+                        <div class="debug-grid"
+                            style="margin-bottom: 14px; grid-template-columns: repeat(3, minmax(0, 1fr));">
                             <div>
-                                <input type="number" id="kpInput" placeholder="Kp" step="0.1" min="0" max="5" value="0.3"
+                                <input type="number" id="kpInput" placeholder="Kp" step="0.1" min="0" max="5"
+                                    value="0.3"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                                 <div class="subtle-note" style="margin-top: 6px;">Proportional</div>
                             </div>
                             <div>
-                                <input type="number" id="kiInput" placeholder="Ki" step="0.1" min="0" max="10" value="1.0"
+                                <input type="number" id="kiInput" placeholder="Ki" step="0.1" min="0" max="10"
+                                    value="1.0"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                                 <div class="subtle-note" style="margin-top: 6px;">Integral</div>
                             </div>
                             <div>
-                                <input type="number" id="kdInput" placeholder="Kd" step="0.01" min="0" max="1" value="0.01"
+                                <input type="number" id="kdInput" placeholder="Kd" step="0.01" min="0" max="1"
+                                    value="0.01"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                                 <div class="subtle-note" style="margin-top: 6px;">Derivative</div>
                             </div>
@@ -1338,14 +1216,17 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                     </div>
                     <div class="control-subpanel" style="margin-top: 18px;">
                         <div class="subpanel-title" style="margin-bottom: 12px;">Position</div>
-                        <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                        <div class="debug-grid"
+                            style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
                             <div>
-                                <input type="number" id="posKpInput" placeholder="Position Gain" step="0.1" min="0" max="50" value="1.2"
+                                <input type="number" id="posKpInput" placeholder="Position Gain" step="0.1" min="0"
+                                    max="50" value="1.2"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                                 <div class="subtle-note" style="margin-top: 6px;">Position-to-velocity gain</div>
                             </div>
                             <div>
-                                <input type="number" id="posKdInput" placeholder="Velocity Damping" step="0.01" min="0" max="5" value="0.04"
+                                <input type="number" id="posKdInput" placeholder="Velocity Damping" step="0.01" min="0"
+                                    max="5" value="0.04"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                                 <div class="subtle-note" style="margin-top: 6px;">Measured-velocity damping term</div>
                             </div>
@@ -1373,32 +1254,30 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                         <h2>Motion Profile</h2>
                     </div>
                     <div class="control-subpanel">
-                        <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: start; row-gap: 16px;">
+                        <div class="debug-grid"
+                            style="margin-bottom: 14px; grid-template-columns: repeat(6, minmax(0, 1fr)); align-items: start; row-gap: 16px;">
                             <div>
-                                <input type="number" id="velocityRampInput" placeholder="Velocity Ramp" step="0.5" min="0.1"
-                                    max="200" value="100.0"
-                                    oninput="markDirty(this)"
+                                <input type="number" id="velocityRampInput" placeholder="Velocity Ramp" step="0.5"
+                                    min="0.1" max="200" value="100.0" oninput="markDirty(this)"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                                 <div class="subtle-note" style="margin-top: 8px;">Velocity accel (rad/s²)</div>
                             </div>
                             <div>
-                                <input type="number" id="positionVelocityLimitInput" placeholder="Position Velocity Limit"
-                                    step="0.5" min="0.2" max="100" value="40.0"
+                                <input type="number" id="positionVelocityLimitInput"
+                                    placeholder="Position Velocity Limit" step="0.5" min="0.2" max="100" value="40.0"
                                     oninput="markDirty(this)"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                                 <div class="subtle-note" style="margin-top: 8px;">Position velocity cap (rad/s)</div>
                             </div>
                             <div>
                                 <input type="number" id="positionAccelLimitInput" placeholder="Position Accel Limit"
-                                    step="0.5" min="0.1" max="400" value="80.0"
-                                    oninput="markDirty(this)"
+                                    step="0.5" min="0.1" max="400" value="80.0" oninput="markDirty(this)"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                                 <div class="subtle-note" style="margin-top: 8px;">Position accel (rad/s²)</div>
                             </div>
                             <div>
                                 <input type="number" id="positionDecelLimitInput" placeholder="Position Decel Limit"
-                                    step="0.5" min="0.1" max="400" value="90.0"
-                                    oninput="markDirty(this)"
+                                    step="0.5" min="0.1" max="400" value="90.0" oninput="markDirty(this)"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
                                 <div class="subtle-note" style="margin-top: 8px;">Position decel (rad/s²)</div>
                             </div>
@@ -1417,7 +1296,8 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                         <h2>Torque Assist</h2>
                     </div>
                     <div class="control-subpanel">
-                        <div class="debug-grid" style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                        <div class="debug-grid"
+                            style="margin-bottom: 14px; grid-template-columns: repeat(2, minmax(0, 1fr));">
                             <div>
                                 <input type="number" id="feedforwardVoltageInput" placeholder="Feedforward Voltage"
                                     step="0.1" min="0" max="6" value="0.8"
@@ -1425,10 +1305,11 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                                 <div class="subtle-note" style="margin-top: 6px;">Low-speed feedforward voltage</div>
                             </div>
                             <div>
-                                <input type="number" id="feedforwardFadeInput" placeholder="Fade Speed" step="0.1" min="0.1"
-                                    max="20" value="3.0"
+                                <input type="number" id="feedforwardFadeInput" placeholder="Fade Speed" step="0.1"
+                                    min="0.1" max="20" value="3.0"
                                     style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                                    <div class="subtle-note" style="margin-top: 6px;">Fade out by this velocity (rad/s)</div>
+                                <div class="subtle-note" style="margin-top: 6px;">Fade out by this velocity (rad/s)
+                                </div>
                             </div>
                         </div>
                         <div class="button-group" style="margin-bottom: 0;">
@@ -1468,18 +1349,21 @@ Copyright (c) 2026 Anthony Campbell (claydonkey)
                             </div>
                             <div class="control-subpanel" style="margin-bottom: 18px;">
                                 <div class="stack-label" style="margin-bottom: 8px;">Low-Velocity Bias</div>
-                                <div class="debug-grid" style="margin-bottom: 12px; grid-template-columns: repeat(2, minmax(0, 1fr));">
+                                <div class="debug-grid"
+                                    style="margin-bottom: 12px; grid-template-columns: repeat(2, minmax(0, 1fr));">
                                     <div>
                                         <input type="number" id="lowSpeedBiasVoltageInput" placeholder="Bias Voltage"
                                             step="0.05" min="0" max="6" value="0.35"
                                             style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                                        <div class="subtle-note" style="margin-top: 6px;">Extra low-speed torque bias (V)</div>
+                                        <div class="subtle-note" style="margin-top: 6px;">Extra low-speed torque bias
+                                            (V)</div>
                                     </div>
                                     <div>
                                         <input type="number" id="lowSpeedBiasFadeInput" placeholder="Bias Fade Velocity"
                                             step="0.1" min="0.1" max="20" value="1.5"
                                             style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 12px;">
-                                        <div class="subtle-note" style="margin-top: 6px;">Fade out by this velocity (rad/s)</div>
+                                        <div class="subtle-note" style="margin-top: 6px;">Fade out by this velocity
+                                            (rad/s)</div>
                                     </div>
                                 </div>
                                 <div class="button-group" style="margin-bottom: 0;">
