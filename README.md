@@ -301,6 +301,40 @@ If you build only:
 
 then the project will compile and generate the `.dfu` file, but it will not actually upload it.
 
+## Browser DFU Flasher
+
+The hosted UI also includes a browser-based DFU flasher page:
+
+- `web/flasher.html`
+
+This exists for a slightly different job than the normal CMake `run` target.
+
+Use the browser flasher when you want:
+
+- a classroom-friendly flashing flow without opening a terminal
+- to hand off from the main dashboard straight into DFU flashing
+- to select and write a prebuilt `.bin` manually from the browser
+
+Typical flow:
+
+1. connect to the normal dashboard
+2. click the DFU button so the board resets into the bootloader
+3. open `flasher.html`
+4. connect the DFU device with WebUSB
+5. choose the application `.bin`
+6. flash to `0x08001000`
+
+Rationale:
+
+- `dfu-util` remains the main scripted and repeatable development path
+- `flasher.html` provides a simpler teaching/demo path using only the browser
+- the flasher is intentionally limited to the normal application region, which makes it harder to accidentally overwrite the bootloader
+
+So the intended split is:
+
+- `dfu-util` / CMake targets for regular development
+- `flasher.html` for browser-based manual updates and teaching use
+
 ## Entering DFU Mode
 
 The application includes a DFU handoff path so it can reset into the bootloader.
