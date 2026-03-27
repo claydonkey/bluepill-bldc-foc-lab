@@ -1,10 +1,16 @@
 {
-    "cmake.cmakePath": "cube-cmake",
-    "cmake.configureArgs": [
-        "-DCMAKE_COMMAND=cube-cmake"
-    ],
+    // These cube-cmake overrides are disabled because this repo now builds
+    // through standard CMake Tools presets and the checked-in toolchain files.
+    // "cmake.cmakePath": "cube-cmake",
+    // "cmake.configureArgs": [
+    //     "-DCMAKE_COMMAND=cube-cmake"
+    // ],
     "cmake.preferredGenerators": [
         "Ninja"
     ],
-    "liveServer.settings.port": 5502
+    "liveServer.settings.port": 5502,
+    "cmake.cmakePath": "cube-cmake",
+    "cmake.configureArgs": [
+        "-DCMAKE_COMMAND=cube-cmake"
+    ]
 }
