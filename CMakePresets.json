@@ -23,6 +23,24 @@
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Release"
             }
+        },
+        {
+            "name": "Debug_NoDFU",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "APP_USE_DFU": "OFF",
+                "STM32_LINKER_SCRIPT": "${sourceDir}/STM32F103CBTX_FLASH.ld"
+            }
+        },
+        {
+            "name": "Release_NoDFU",
+            "inherits": "default",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "APP_USE_DFU": "OFF",
+                "STM32_LINKER_SCRIPT": "${sourceDir}/STM32F103CBTX_FLASH.ld"
+            }
         }
     ],
     "buildPresets": [
@@ -33,6 +51,14 @@
         {
             "name": "Release",
             "configurePreset": "Release"
+        },
+        {
+            "name": "Debug_NoDFU",
+            "configurePreset": "Debug_NoDFU"
+        },
+        {
+            "name": "Release_NoDFU",
+            "configurePreset": "Release_NoDFU"
         }
     ]
 }

@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<!--
+SPDX-License-Identifier: MIT
+Copyright (c) 2026 Anthony Campbell (claydonkey)
+-->
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bluepill BLDC FOC Lab Flasher</title>
+    <link rel="icon" type="image/svg+xml" href="./lemon.svg">
+    <link rel="stylesheet" href="./shared-theme.css">
+    <style>
+        :root {
+            --panel-soft-2: rgba(255, 255, 255, 0.72);
+            --log-bg: rgba(15, 23, 42, 0.92);
+            --log-border: rgba(148, 163, 184, 0.18);
+            --log-text: #dbeafe;
+        }
+
+        :root[data-theme="dark"] {
+            --panel-soft-2: rgba(15, 23, 42, 0.78);
+            --log-bg: rgba(2, 6, 23, 0.9);
+            --log-border: rgba(148, 163, 184, 0.14);
+            --log-text: #dbeafe;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: "Segoe UI Variable", "Segoe UI", "Trebuchet MS", sans-serif;
+            background:
+                radial-gradient(circle at 15% 15%, rgba(45, 212, 191, 0.18), transparent 24%),
+                radial-gradient(circle at 85% 10%, rgba(56, 189, 248, 0.18), transparent 24%),
+                radial-gradient(circle at 50% 100%, rgba(14, 165, 233, 0.12), transparent 32%),
+                linear-gradient(145deg, var(--bg-1) 0%, var(--bg-2) 48%, var(--bg-3) 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 28px 18px 40px;
+            color: var(--text);
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        button,
+        .toolbar-link,
+        .action-link {
+            border: 0;
+            border-radius: 14px;
+            padding: 12px 16px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: transform 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+        }
+
+        button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .toolbar-link,
+        .toolbar-button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 144px;
+            border: 1px solid var(--toolbar-button-border);
+            background: var(--toolbar-button-bg);
+            color: var(--toolbar-button-text);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+        }
+
+        .toolbar-link:hover,
+        .toolbar-button:hover,
+        .btn-primary:hover,
+        .btn-secondary:hover {
+            transform: translateY(-1px);
+        }
+
+        .container {
+            position: relative;
+            background: var(--container-bg);
+            backdrop-filter: blur(24px);
+            border-radius: 32px;
+            box-shadow: var(--shadow);
+            padding: 30px;
+            max-width: 1180px;
+            width: 100%;
+            border: 1px solid var(--container-border);
+            transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: 1.22fr 0.95fr;
+            gap: 18px;
+            align-items: stretch;
+            margin-bottom: 26px;
+        }
+
+        .hero-copy {
+            max-width: 100%;
+            padding: 8px 0 0;
+        }
+
+        .hero-brand-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            margin-bottom: 4px;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 10px;
+            padding-top: 10px;
+        }
+
+        .hero-title-icon {
+            width: 116px;
+            height: 116px;
+            display: block;
+            margin-bottom: 10px;
+            margin-top: -8px;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--text);
+            font-size: clamp(2.1rem, 4vw, 3.35rem);
+            line-height: 0.95;
+            letter-spacing: -0.05em;
+        }
+
+        .hero-copy p {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.6;
+            max-width: 64ch;
+        }
+
+        .hero-status {
+            display: grid;
+            gap: 12px;
+            align-content: start;
+            width: 100%;
+            justify-self: stretch;
+        }
+
+        .hero-card {
+            padding: 18px 20px;
+            border-radius: 22px;
+            background: var(--hero-card-bg);
+            border: 1px solid var(--hero-card-border);
+            box-shadow: var(--shadow-soft);
+        }
+
+        .hero-card-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+
+        .hero-stat {
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: var(--hero-stat-bg);
+            border: 1px solid var(--hero-stat-border);
+        }
+
+        .hero-stat-label {
+            color: var(--muted);
+            font-size: 0.77rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+        }
+
+        .hero-stat-value {
+            font-weight: 800;
+            font-size: 1.05rem;
+            color: var(--text);
+        }
+
+        .page-grid {
+            display: grid;
+            grid-template-columns: 1.22fr 0.95fr;
+            gap: 22px;
+        }
+
+        .left-column,
+        .right-column {
+            display: grid;
+            gap: 20px;
+            align-content: start;
+            min-width: 0;
+        }
+
+        .panel {
+            background: linear-gradient(180deg, var(--panel-strong) 0%, var(--panel-soft) 100%);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            box-shadow: var(--shadow-soft);
+            padding: 22px;
+            min-width: 0;
+            transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .panel-header h2 {
+            margin: 0;
+            font-size: 1.05rem;
+            letter-spacing: -0.02em;
+        }
+
+        .subtle-note {
+            color: var(--muted);
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+
+        .warning-box {
+            display: grid;
+            gap: 8px;
+            padding: 14px 16px;
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(254, 249, 195, 0.9) 0%, rgba(254, 240, 138, 0.82) 100%);
+            border: 1px solid rgba(217, 119, 6, 0.2);
+            color: #713f12;
+            margin-bottom: 18px;
+        }
+
+        :root[data-theme="dark"] .warning-box {
+            background: linear-gradient(180deg, rgba(120, 53, 15, 0.55) 0%, rgba(113, 63, 18, 0.48) 100%);
+            border-color: rgba(251, 191, 36, 0.22);
+            color: #fde68a;
+        }
+
+        .control-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .control-subpanel {
+            display: grid;
+            gap: 14px;
+            padding: 12px;
+            border-radius: 18px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.62) 0%, var(--panel-soft-2) 100%);
+            border: 1px solid var(--border);
+        }
+
+        .control-block-title {
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: var(--muted);
+        }
+
+        .field-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        label {
+            display: grid;
+            gap: 7px;
+            color: var(--text);
+            font-weight: 700;
+            font-size: 0.92rem;
+        }
+
+        input[type="file"],
+        input[type="text"] {
+            width: 100%;
+            border-radius: 14px;
+            border: 1px solid var(--field-border);
+            background: var(--field-bg);
+            color: var(--text);
+            padding: 12px 14px;
+            font-size: 0.95rem;
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #2563eb 0%, #0b5ed7 100%);
+            color: #fff;
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.28);
+        }
+
+        .btn-secondary {
+            background: var(--btn-query-bg);
+            color: var(--btn-query-text);
+            border: 1px solid var(--btn-query-border);
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.12);
+        }
+
+        .progress-shell {
+            display: grid;
+            gap: 8px;
+        }
+
+        .progress-bar {
+            height: 14px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.18);
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.16);
+        }
+
+        .progress-bar-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(135deg, #0f766e 0%, #2563eb 100%);
+            transition: width 0.18s ease;
+        }
+
+        .progress-caption {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .list-note {
+            display: grid;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 0.92rem;
+            line-height: 1.55;
+        }
+
+        .list-note span::before {
+            content: "•";
+            margin-right: 8px;
+            color: var(--accent-2);
+        }
+
+        .log-frame {
+            background: var(--log-bg);
+            color: var(--log-text);
+            border-radius: 18px;
+            border: 1px solid var(--log-border);
+            min-height: 320px;
+            max-height: 520px;
+            overflow: auto;
+            padding: 14px;
+            font-family: "Cascadia Code", "Consolas", monospace;
+            font-size: 0.84rem;
+            line-height: 1.55;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 7px 11px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            color: var(--text);
+            font-weight: 700;
+            width: fit-content;
+        }
+
+        :root[data-theme="dark"] .status-pill {
+            background: rgba(15, 23, 42, 0.82);
+            border-color: rgba(148, 163, 184, 0.16);
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.9);
+            box-shadow: 0 0 0 0 rgba(148, 163, 184, 0.25);
+        }
+
+        .status-dot.connected {
+            background: #10b981;
+            box-shadow: 0 0 16px rgba(16, 185, 129, 0.42);
+        }
+
+        .app-footer {
+            margin-top: 28px;
+            padding-top: 18px;
+            border-top: 1px solid rgba(148, 163, 184, 0.24);
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 18px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 0.84rem;
+            line-height: 1.6;
+        }
+
+        .footer-copy {
+            max-width: 60ch;
+        }
+
+        .footer-meta {
+            display: flex;
+            gap: 10px 14px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .footer-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--footer-chip-bg);
+            border: 1px solid var(--footer-chip-border);
+            color: var(--text);
+            font-weight: 600;
+            letter-spacing: 0.01em;
+        }
+
+        @media (max-width: 980px) {
+            .hero,
+            .page-grid,
+            .field-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-brand-row {
+                flex-direction: column;
+            }
+
+            .hero-actions {
+                justify-content: flex-start;
+                padding-top: 0;
+            }
+
+            .panel {
+                padding: 18px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <section class="hero">
+            <div class="hero-copy">
+                <div class="hero-brand-row">
+                    <div>
+                        <img src="./lemon.svg" alt="Bluepill BLDC FOC Lab icon" class="hero-title-icon">
+                        <h1>Bluepill BLDC FOC Lab</h1>
+                    </div>
+                    <div class="hero-actions">
+                        <a href="./index.html" class="toolbar-link">Back To Console</a>
+                        <button type="button" class="toolbar-button" id="themeToggleBtn">Dark Theme</button>
+                    </div>
+                </div>
+                <p>
+                    Experimental browser flasher for the Bluepill DFU bootloader. This page is intentionally limited to
+                    application images only, written from <code>0x08001000</code> so the bootloader region stays out of
+                    harm's way.
+                </p>
+            </div>
+            <div class="hero-status">
+                <div class="hero-card">
+                    <div class="hero-card-grid">
+                        <div class="hero-stat">
+                            <div class="hero-stat-label">WebUSB</div>
+                            <div class="hero-stat-value" id="webUsbStatus">Checking…</div>
+                        </div>
+                        <div class="hero-stat">
+                            <div class="hero-stat-label">DFU Device</div>
+                            <div class="hero-stat-value" id="deviceStatus">Disconnected</div>
+                        </div>
+                        <div class="hero-stat">
+                            <div class="hero-stat-label">Target Address</div>
+                            <div class="hero-stat-value" id="targetAddressStat">0x08001000</div>
+                        </div>
+                        <div class="hero-stat">
+                            <div class="hero-stat-label">Selected Image</div>
+                            <div class="hero-stat-value" id="fileStatus">None</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="status-pill">
+                    <span class="status-dot" id="deviceDot"></span>
+                    <span id="deviceSummary">Waiting for DFU device</span>
+                </div>
+            </div>
+        </section>
+
+        <div class="page-grid">
+            <div class="left-column">
+                <section class="panel">
+                    <div class="panel-header">
+                        <h2>Flash Setup</h2>
+                    </div>
+                    <div class="warning-box">
+                        <strong>Use this for app images only.</strong>
+                        <span>Flash the bootloader separately. This page assumes the DFU bootloader is already present
+                            and only writes the application region.</span>
+                    </div>
+                    <div class="control-grid">
+                        <div class="control-subpanel">
+                            <div class="control-block-title">Firmware</div>
+                            <label for="firmwareFile">Application `.bin`</label>
+                            <input type="file" id="firmwareFile" accept=".bin,application/octet-stream">
+                            <div class="subtle-note" id="fileMeta">No file selected.</div>
+                        </div>
+
+                        <div class="control-subpanel">
+                            <div class="control-block-title">Target</div>
+                            <div class="field-grid">
+                                <label for="targetAddressInput">
+                                    Flash start address
+                                    <input type="text" id="targetAddressInput" value="0x08001000" spellcheck="false">
+                                </label>
+                                <label for="chunkSizeInput">
+                                    Chunk size
+                                    <input type="text" id="chunkSizeInput" value="1024" spellcheck="false">
+                                </label>
+                            </div>
+                            <div class="subtle-note">
+                                Default settings match the current DFU flow used by <code>dfu-util -a 0 -s
+                                    0x08001000:leave</code>.
+                            </div>
+                        </div>
+
+                        <div class="control-subpanel">
+                            <div class="control-block-title">Actions</div>
+                            <div class="button-row">
+                                <button type="button" class="btn-secondary" id="connectDfuBtn">Connect DFU Device</button>
+                                <button type="button" class="btn-primary" id="flashBtn" disabled>Flash Application</button>
+                                <button type="button" class="btn-secondary" id="leaveDfuBtn" disabled>Leave DFU</button>
+                            </div>
+                            <div class="subtle-note">
+                                If the board is still running the normal app, first use the main console’s DFU button or
+                                your DFU entry hardware path to move it into bootloader mode.
+                            </div>
+                        </div>
+
+                        <div class="progress-shell">
+                            <div class="progress-caption">
+                                <span id="progressLabel">Idle</span>
+                                <span id="progressValue">0%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-bar-fill" id="progressBarFill"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="right-column">
+                <section class="panel">
+                    <div class="panel-header">
+                        <h2>Flashing Notes</h2>
+                    </div>
+                    <div class="list-note">
+                        <span>Chrome or Edge on desktop is required. WebUSB is not broadly available elsewhere.</span>
+                        <span>This first version assumes a standard DFU-class interface and the current Bluepill app
+                            image layout.</span>
+                        <span>If automatic leave/reset does not work on your board, unplug and reconnect after the write
+                            completes.</span>
+                    </div>
+                </section>
+
+                <section class="panel">
+                    <div class="panel-header">
+                        <h2>Activity Log</h2>
+                        <button type="button" class="btn-secondary" id="clearLogBtn">Clear</button>
+                    </div>
+                    <div class="log-frame" id="logOutput"></div>
+                </section>
+            </div>
+        </div>
+
+        <footer class="app-footer">
+            <div class="footer-copy">
+                Minimal WebUSB DFU flasher for the Bluepill BLDC FOC Lab project. It is intentionally scoped to the
+                normal application region so the browser workflow stays simple and hard to misuse.
+            </div>
+            <div class="footer-meta">
+                <span class="footer-chip">STM32F103 Bluepill</span>
+                <span class="footer-chip">Anthony Campbell (claydonkey)</span>
+                <span class="footer-chip">MIT Licensed</span>
+            </div>
+        </footer>
+    </div>
+
+    <script src="./flasher.js"></script>
+</body>
+
+</html>
