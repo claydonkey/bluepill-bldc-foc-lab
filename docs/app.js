@@ -1161,6 +1161,10 @@ async function requestDfuMode() {
 
     try {
         await sendCommand('SET_MODE_DFU');
+        appendDebugConsole('SYS Redirecting to Web DFU Flasher', 'sys');
+        window.setTimeout(() => {
+            window.location.href = './flasher.html';
+        }, 900);
     } catch (error) {
         console.error('Failed to enter DFU mode:', error);
         appendDebugConsole(`ERR DFU request failed: ${error}`, 'err');

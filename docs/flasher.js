@@ -146,7 +146,14 @@ function delay(ms) {
 
 function setProgress(value, label) {
     const next = Math.max(0, Math.min(100, value));
-    $('progressBarFill').style.width = `${next}%`;
+    const progressBar = $('progressBarFill');
+    if (progressBar) {
+        if ('value' in progressBar) {
+            progressBar.value = next;
+        } else {
+            progressBar.style.width = `${next}%`;
+        }
+    }
     $('progressValue').textContent = `${Math.round(next)}%`;
     if (label) {
         $('progressLabel').textContent = label;
@@ -161,11 +168,8 @@ function updateUi() {
     $('deviceStatus').textContent = connected ? 'Connected' : 'Disconnected';
     $('fileStatus').textContent = state.file ? state.file.name : 'None';
     $('targetAddressStat').textContent = $('targetAddressInput').value.trim() || '0x08001000';
-    $('deviceDot').classList.toggle('connected', connected);
-    $('deviceSummary').textContent = connected
-        ? `Connected to ${state.device.productName || 'DFU device'}`
-        : 'Waiting for DFU device';
     $('connectDfuBtn').textContent = connected ? 'Reconnect DFU Device' : 'Connect DFU Device';
+    $('flashBtn').style.display = connected ? 'inline' : 'none';
     $('flashBtn').disabled = !connected || !fileLoaded || state.busy;
     $('leaveDfuBtn').disabled = !connected || state.busy;
     $('connectDfuBtn').disabled = state.busy || !webUsb;

@@ -8,6 +8,6 @@
 		}
 	],
 	"settings": {
-		"liveServer.settings.multiRootWorkspaceName": "stm32f103cbt6_foc"
+		"liveServer.settings.multiRootWorkspaceName": "stm32mx103_course"
 	}
 }
